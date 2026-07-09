@@ -9,3 +9,4 @@
 export * from "./placeholder-stage";
 export * from "./registry";
 export * from "./genesis/placeholder-generator";
+export * from "./genesis/placeholder-prototype";
