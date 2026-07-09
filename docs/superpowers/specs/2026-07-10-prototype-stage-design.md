@@ -10,8 +10,8 @@ Industrialize the manual flow that closed the Khatuna deal: minimal input
 (brief + logo) → a knockout, finished-looking mockup shown at the **first**
 client meeting. Agency OS does not render the mockup; it generates the
 **ammunition** — brand assumptions, positioning, prototype direction, and a
-ready-to-paste **Claude Design prompt** with the owner's design-DNA baked in —
-wrapped in the mandatory Stage Contract.
+ready-to-paste **Claude Design prompt** grounded in the client's world, carrying the
+owner's non-negotiables — wrapped in the mandatory Stage Contract.
 
 After this stage, the project page is the **first-meeting kit**: the mockup
 prompt (copy → Claude Design → mockup) plus Discovery's questions to ask the
@@ -26,10 +26,15 @@ client at the meeting.
 - **Auto at genesis, sequential.** One form submit runs Discovery, then
   Prototype with Discovery's full result as context. The kit exists the moment
   a prospect appears — no second trigger to remember. Owner confirmed.
-- **Design DNA baked into the versioned template.** The Khatuna win came from
-  the owner's taste. A condensed doctrine (source:
-  `~/.claude/skills/design-dna/SKILL.md`) is embedded in the prompt template as
-  a versioned const — every prospect's design prompt enforces it automatically.
+- **World-first prompt; design-DNA reduced to a thin hard floor.** The first
+  draft embedded the full condensed doctrine
+  (`~/.claude/skills/design-dna/SKILL.md`); owner rejected it — the DNA skill
+  is a *judge* (testable failure checks), not a *generator*, and "not very
+  good to build something on". The Khatuna-winning prompt was thin: world +
+  logo + Claude Design doing the aesthetics. So the generated prompt's payload
+  is the client's WORLD (dossier, positioning, buyer job) — the part a thin
+  manual prompt lacks — plus a short non-negotiables floor. The doctrine's
+  10-check rubric returns later as a mockup-judging step (out of scope).
 - **Mirror the Discovery seam (approach A).** New port + Claude adapter +
   placeholder fallback + container binding, exactly like Discovery. No combined
   mega-call (couples stages, one readiness for two questions), no agent runtime
@@ -49,7 +54,7 @@ client at the meeting.
 4. Composition binding (key present → Claude; absent → placeholder).
 5. `runGenesis` runs Discovery then Prototype; result recorded under
    `"prototype"`; two history events.
-6. Versioned prompt template with the condensed design-DNA block.
+6. Versioned prompt template: world-first, with the non-negotiables floor.
 7. Output UI (`PrototypeOutputView`) + copy-to-clipboard button.
 8. Domain tests (Vitest) for the new pieces.
 9. `agents/prototype.agent.ts` declaration (design-only, mirrors
@@ -60,7 +65,9 @@ client at the meeting.
 In-app mockup rendering · editing outputs by hand · re-run buttons · logo
 vision analysis (model never sees bytes; assets stay URIs) · DB binding ·
 streaming · retries/queues · cost tracking · deploy · Arabic UI for Agency OS
-itself · Brand/Research/Strategy stages · auto-advancing `currentStage`.
+itself · Brand/Research/Strategy stages · auto-advancing `currentStage` ·
+mockup judging (the DNA 10-check rubric applies *after* Claude Design produces
+the mockup — a future step, not this stage).
 
 ## Domain: output shape
 
@@ -178,21 +185,17 @@ world-specific mockup at the first meeting.
    > Every screen must surface at least one WORLD fact from the brief. Any
    > element that could appear unchanged in any other shop's app is a defect
    > — redesign it from the brief.
-4. **Condensed design-DNA block** (versioned const `DESIGN_DNA` in the same
-   file; distilled at implementation time from the skill source):
-   OKLCH-only color with chroma as a budget (neutrals C ≤ 0.02 hue-biased, ONE
-   accent hue C 0.15–0.20 on primary action/active/key metric, semantic ≤
-   0.14, ramps walk L only, dark mode re-walks L and drops C ~15%) · spacing
-   scale 4/8/12/16/24/32/48/64 with group-gap ≤ half between-group gap ·
-   one boss per screen (survives a 5px-blur test), adjacent type levels ≥
-   1.33× or two properties, boss ≥ 1.8× body · Arabic physics (body
-   line-height 1.7–1.9, headings 1.3–1.4, letter-spacing 0 always, display
-   face from brand personality + neutral workhorse body, Latin brand names
-   stay Latin, one digit system, `tabular-nums` prices, `dir="ltr"`/`<bdi>`
-   phones, Arabic body +1–2 px, woff2 + logical props) · real content only
-   (believable local prices, no lorem, no round marketing numbers), buyer's
-   dialect voice, ≥ 1 local trust anchor per screen when fears exist (COD,
-   delivery area, guarantee).
+4. **Non-negotiables floor** (versioned const `HARD_FLOOR` in the same file —
+   deliberately short, ~10 rules; a floor against generic-AI output, not a
+   ceiling on Claude Design's aesthetics): Arabic body line-height 1.7–1.9 /
+   headings 1.3–1.4 · letter-spacing 0 on all Arabic · Latin brand names stay
+   Latin · one digit system, `tabular-nums` prices · `dir="ltr"`/`<bdi>` for
+   phone numbers · RTL via logical properties · real content only (believable
+   local prices, zero lorem, zero round marketing numbers) · buyer's dialect
+   voice, ≥ 1 visible trust anchor when fears exist (COD, delivery area,
+   guarantee) · ONE accent color, spent on the primary action. Everything
+   else in the doctrine (OKLCH ramp math, spacing scales, blur tests, type
+   ratios) is judging physics for the build phase — NOT prompt payload.
 5. **Defaults:** Arabic-first RTL, mobile-first for low-end Android — adapted
    from `market`/`country`.
 6. **Close:** instruct the operator hand-off — attach the logo (referenced by
@@ -230,8 +233,8 @@ failure; no silently faked results.
 1. `PlaceholderPrototypeGenerator` returns a valid `StageResult` with
    `stage: "prototype"` and a gate consistent with its readiness.
 2. Prototype prompt render includes: business name, both mandated opening
-   sentences, at least one DNA marker (e.g. "oklch"), and Discovery's
-   `interpretedBrief`.
+   sentences, a hard-floor marker (e.g. the Arabic line-height rule), and
+   Discovery's `interpretedBrief`.
 3. Workflow records discovery + prototype: both `stageStatus` = `"done"`,
    `completionRatio` = 2/7.
 4. `ClaudePrototypeGenerator`'s network call is **not** unit-tested (same
