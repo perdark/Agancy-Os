@@ -1,4 +1,4 @@
-import type { GenesisOutput } from "@/domain";
+import type { DiscoveryOutput, SignalConfidence } from "@/domain";
 import {
   Card,
   CardContent,
@@ -7,49 +7,87 @@ import {
 } from "@/components/ui/card";
 
 /**
- * Renders the five Genesis deliverables. This is the stage-specific `output`
- * renderer that complements the uniform Stage Contract view. In Version 1 the
- * content is placeholder text produced by the placeholder generator.
+ * Renders the Discovery deliverables — the decoded brief. This is the
+ * stage-specific `output` renderer that complements the uniform Stage Contract
+ * view. Its centrepiece is the decoded-signals table: vague client words →
+ * likely meaning → confidence.
  */
-export function GenesisOutputView({ output }: { output: GenesisOutput }) {
+export function GenesisOutputView({ output }: { output: DiscoveryOutput }) {
   return (
     <div className="grid gap-4">
-      <Block title="Brand assumptions">
-        <p>{output.brandAssumptions.toneOfVoice}</p>
-        <p className="text-muted-foreground">
-          {output.brandAssumptions.visualDirection}
-        </p>
-        <TagList items={output.brandAssumptions.values} />
+      <Block title="Interpreted brief">
+        <p>{output.interpretedBrief}</p>
       </Block>
 
-      <Block title="Positioning">
-        <p>{output.positioning.statement}</p>
-        <p className="text-muted-foreground">
-          Target: {output.positioning.targetSegment}
-        </p>
-        <p className="text-muted-foreground">
-          {output.positioning.competitiveContext}
-        </p>
-        <TagList items={output.positioning.differentiators} />
+      <Block title="Decoded signals">
+        {output.decodedSignals.length === 0 ? (
+          <p className="text-muted-foreground">No signals decoded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-1 pe-4 font-medium">Client said</th>
+                  <th className="py-1 pe-4 font-medium">Likely means</th>
+                  <th className="py-1 font-medium">Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {output.decodedSignals.map((signal, i) => (
+                  <tr key={i} className="border-t align-top">
+                    <td className="py-2 pe-4 font-medium">
+                      “{signal.clientSaid}”
+                    </td>
+                    <td className="py-2 pe-4 text-muted-foreground">
+                      {signal.likelyMeans}
+                    </td>
+                    <td className="py-2">
+                      <Confidence level={signal.confidence} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Block>
 
-      <Block title="Strategic brief">
-        <p>{output.strategicBrief.summary}</p>
-        <TagList items={output.strategicBrief.objectives} />
+      <Block title="Questions to ask the client">
+        {output.openQuestions.length === 0 ? (
+          <p className="text-muted-foreground">No open questions.</p>
+        ) : (
+          <ul className="space-y-2">
+            {output.openQuestions.map((q, i) => (
+              <li key={i}>
+                <p className="font-medium">{q.question}</p>
+                <p className="text-muted-foreground">{q.whyItMatters}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </Block>
 
-      <Block title="Prototype direction">
-        <p>{output.prototypeDirection.concept}</p>
-        <TagList items={output.prototypeDirection.keyScreens} />
-      </Block>
-
-      <Block title="Claude design prompt">
-        <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">
-          {output.designPrompt.prompt}
-        </pre>
-        <TagList items={output.designPrompt.constraints} />
+      <Block title="Assumptions">
+        {output.assumptions.length === 0 ? (
+          <p className="text-muted-foreground">None stated.</p>
+        ) : (
+          <ul className="list-disc space-y-1 ps-5">
+            {output.assumptions.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        )}
       </Block>
     </div>
+  );
+}
+
+function Confidence({ level }: { level: SignalConfidence }) {
+  const label = { low: "Low", medium: "Medium", high: "High" }[level];
+  return (
+    <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+      {label}
+    </span>
   );
 }
 
@@ -67,21 +105,5 @@ function Block({
       </CardHeader>
       <CardContent className="space-y-2 text-sm">{children}</CardContent>
     </Card>
-  );
-}
-
-function TagList({ items }: { items: readonly string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <ul className="flex flex-wrap gap-1.5 pt-1">
-      {items.map((item) => (
-        <li
-          key={item}
-          className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
-        >
-          {item}
-        </li>
-      ))}
-    </ul>
   );
 }

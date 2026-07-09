@@ -15,10 +15,21 @@ import { STAGE_LABELS } from "@/domain";
  * persistence; which one is used is a composition decision, not a domain one.
  *
  * NOTE: process-local and non-durable — intended for local development and to
- * keep Version 1 runnable before a database is provisioned.
+ * keep Version 1 runnable before a database is provisioned. The store is held on
+ * `globalThis` (not a plain module-level constant) so it survives Next.js dev
+ * route-segment isolation and HMR: the server action and the page render, which
+ * run in separate module graphs, share one store within the process. Flip
+ * composition to the Drizzle adapter before any real/multi-instance deployment.
  */
+type ProjectStore = Map<ProjectId, Project>;
+
+const globalRef = globalThis as unknown as {
+  __agencyOsProjects?: ProjectStore;
+};
+const store: ProjectStore = (globalRef.__agencyOsProjects ??= new Map());
+
 export class InMemoryProjectRepository implements ProjectRepository {
-  private readonly store = new Map<ProjectId, Project>();
+  private readonly store = store;
 
   async save(project: Project): Promise<void> {
     this.store.set(project.id, project);

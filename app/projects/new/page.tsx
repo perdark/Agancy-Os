@@ -8,9 +8,9 @@ export default function NewProjectPage() {
           Project Genesis
         </h1>
         <p className="text-muted-foreground">
-          Capture the brief. Genesis turns it into brand assumptions,
-          positioning, a strategic brief, a prototype direction, and a design
-          prompt — wrapped in the Stage Contract.
+          Capture the brief. Discovery decodes it — the client&rsquo;s vague
+          words into likely meaning, the questions to ask them, and the
+          assumptions to check — wrapped in the Stage Contract.
         </p>
       </div>
       <GenesisForm />

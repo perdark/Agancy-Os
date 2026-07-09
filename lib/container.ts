@@ -2,12 +2,13 @@ import "server-only";
 import {
   systemClock,
   type Clock,
-  type GenesisGenerator,
+  type DiscoveryGenerator,
   type ProjectRepository,
   type StageContext,
   type StageRegistry,
 } from "@/domain";
-import { buildStageRegistry, PlaceholderGenesisGenerator } from "@/stages";
+import { buildStageRegistry, PlaceholderDiscoveryGenerator } from "@/stages";
+import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { cryptoIdGenerator } from "./adapters/id-generator";
 import { InMemoryProjectRepository } from "./adapters/in-memory-project-repository";
 
@@ -21,14 +22,14 @@ import { InMemoryProjectRepository } from "./adapters/in-memory-project-reposito
  *
  * Version 1 bindings, all deliberately minimal:
  *   ProjectRepository  → in-memory (no database required to run)
- *   GenesisGenerator   → deterministic placeholder (no AI)
+ *   DiscoveryGenerator → Claude when ANTHROPIC_API_KEY is set, else placeholder
  *   StageRegistry      → seven placeholder stages
  */
 export interface Container {
   readonly clock: Clock;
   readonly context: StageContext;
   readonly projects: ProjectRepository;
-  readonly genesisGenerator: GenesisGenerator;
+  readonly discoveryGenerator: DiscoveryGenerator;
   readonly stages: StageRegistry;
 }
 
@@ -42,11 +43,17 @@ export const getContainer = (): Container => {
     clock: systemClock,
   };
 
+  // The one place the AI seam is bound: a real generator when a key is present,
+  // the deterministic placeholder when it is not (so the app always runs).
+  const discoveryGenerator = process.env.ANTHROPIC_API_KEY
+    ? new ClaudeDiscoveryGenerator()
+    : new PlaceholderDiscoveryGenerator();
+
   container = {
     clock: systemClock,
     context,
     projects: new InMemoryProjectRepository(),
-    genesisGenerator: new PlaceholderGenesisGenerator(),
+    discoveryGenerator,
     stages: buildStageRegistry(),
   };
 

@@ -24,7 +24,16 @@ export const createProjectFromGenesis = async (
     return { ok: false, error: "The brief is incomplete or invalid." };
   }
 
-  const { project } = await runGenesis(parsed.data);
-  revalidatePath("/projects");
-  return { ok: true, projectId: project.id };
+  try {
+    const { project } = await runGenesis(parsed.data);
+    revalidatePath("/projects");
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    // A failed decode is honest and visible; no project is persisted.
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Discovery failed. Please try again.";
+    return { ok: false, error: message };
+  }
 };

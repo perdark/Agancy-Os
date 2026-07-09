@@ -1,2 +1,2 @@
 export * from "./types";
-export * from "./genesis/genesis.prompt";
+export * from "./discovery/discovery.prompt";

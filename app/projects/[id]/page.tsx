@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import {
   PRICE_LEVEL_LABELS,
-  type GenesisOutput,
+  type DiscoveryOutput,
   type StageResult,
 } from "@/domain";
 import { getProject } from "@/features/projects/service";
@@ -26,9 +26,9 @@ export default async function ProjectDetailPage({
   const project = await getProject(id);
   if (!project) notFound();
 
-  // Genesis records its output under the "brand" stage.
-  const genesis = project.workflow.results.brand as
-    | StageResult<GenesisOutput>
+  // Genesis runs the Discovery stage.
+  const genesis = project.workflow.results.discovery as
+    | StageResult<DiscoveryOutput>
     | undefined;
 
   return (
@@ -77,7 +77,7 @@ export default async function ProjectDetailPage({
       {genesis ? (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Genesis output
+            Discovery
           </h2>
           <StageContractView result={genesis} />
           <GenesisOutputView output={genesis.output} />

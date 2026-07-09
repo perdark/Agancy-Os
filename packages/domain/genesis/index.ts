@@ -1,3 +1,3 @@
 export * from "./genesis-input";
-export * from "./genesis-output";
-export * from "./genesis-generator";
+export * from "./discovery-output";
+export * from "./discovery-generator";

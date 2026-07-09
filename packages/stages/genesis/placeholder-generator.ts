@@ -1,66 +1,42 @@
 import {
   buildStageResult,
-  type GenesisGenerator,
+  type DiscoveryGenerator,
+  type DiscoveryOutput,
   type GenesisInput,
-  type GenesisOutput,
   type StageContext,
   type StageResult,
 } from "@/domain";
 
 /**
- * PlaceholderGenesisGenerator — the Version 1 stand-in for the AI layer.
+ * PlaceholderDiscoveryGenerator — the no-API-key fallback for the Discovery stage.
  *
- * It implements the {@link GenesisGenerator} port exactly, but performs NO AI
+ * It implements the {@link DiscoveryGenerator} port exactly, but performs NO AI
  * generation. Instead it returns a fully-formed Stage Contract whose output is
  * scaffolded from the operator's own input and whose readiness is deliberately
  * low, with the gaps surfaced as `missingInformation` and `doubts`.
  *
- * The point is architectural: the whole Genesis flow — form → generate →
- * render a Stage Contract → persist — is exercised today. Replacing this class
- * with a real model-backed implementation is a one-line swap in composition,
- * because every caller depends on the port, not on this class.
+ * The point is that the whole Discovery flow — form → generate → render a Stage
+ * Contract → persist — runs today even with zero configuration. When
+ * `ANTHROPIC_API_KEY` is present, composition binds the real
+ * `ClaudeDiscoveryGenerator` instead; nothing else changes.
  */
-export class PlaceholderGenesisGenerator implements GenesisGenerator {
+export class PlaceholderDiscoveryGenerator implements DiscoveryGenerator {
   async generate(
     input: GenesisInput,
     context: StageContext,
-  ): Promise<StageResult<GenesisOutput>> {
-    const output: GenesisOutput = {
-      brandAssumptions: {
-        personality: [],
-        values: [],
-        toneOfVoice: `Awaiting generation — brief describes a ${input.priceLevel} ${input.businessType}.`,
-        visualDirection: "Awaiting generation.",
-      },
-      positioning: {
-        statement: "Awaiting generation.",
-        targetSegment: input.audience,
-        differentiators: [],
-        competitiveContext: `Market: ${input.market} (${input.country}).`,
-      },
-      strategicBrief: {
-        summary: "Awaiting generation.",
-        objectives: [],
-        keyMessages: [],
-        successCriteria: [],
-      },
-      prototypeDirection: {
-        concept: "Awaiting generation.",
-        keyScreens: [],
-        experiencePrinciples: [],
-      },
-      designPrompt: {
-        prompt: "Awaiting generation.",
-        constraints: [],
-        references: input.assets.map((a) => a.label),
-      },
+  ): Promise<StageResult<DiscoveryOutput>> {
+    const output: DiscoveryOutput = {
+      interpretedBrief: `A ${input.priceLevel} ${input.businessType} in ${input.market} (${input.country}), for ${input.audience}. Awaiting AI decode.`,
+      decodedSignals: [],
+      openQuestions: [],
+      assumptions: [],
     };
 
-    return buildStageResult<GenesisOutput>(
+    return buildStageResult<DiscoveryOutput>(
       {
-        stage: "brand",
+        stage: "discovery",
         output,
-        // Low by design: nothing has actually been reasoned yet.
+        // Low by design: nothing has actually been decoded yet.
         readiness: 10,
         evidence: [
           {
@@ -74,33 +50,33 @@ export class PlaceholderGenesisGenerator implements GenesisGenerator {
           {
             id: context.ids.next(),
             concern:
-              "AI generation is not yet implemented — all strategic output is a placeholder.",
+              "No AI key is configured — the brief has not been decoded. Set ANTHROPIC_API_KEY to run Discovery.",
             severity: "high",
           },
         ],
         missingInformation: [
           {
             id: context.ids.next(),
-            label: "Generated strategy",
+            label: "Decoded discovery",
             whyItMatters:
-              "Brand, positioning, brief and prototype direction must be produced by the (future) AI layer before this stage can pass its quality gate.",
+              "The vague brief must be decoded into signals, open questions, and assumptions before Discovery can pass its quality gate.",
             impact: "high",
           },
         ],
         recommendations: [
           {
             id: context.ids.next(),
-            title: "Wire the AI generation layer",
+            title: "Add an Anthropic API key",
             detail:
-              "Implement GenesisGenerator against a model and register it in composition to replace this placeholder.",
+              "Put ANTHROPIC_API_KEY in .env.local and re-run; the Claude discovery generator will decode the brief.",
             priority: "now",
           },
         ],
         nextStep: {
-          headline: "Review the captured brief",
+          headline: "Configure the AI key, then re-run Discovery",
           detail:
-            "Confirm the identity is correct, then run generation once the AI layer is connected.",
-          targetStage: "brand",
+            "Confirm the captured identity is correct, add the key, and create the project again to decode the brief.",
+          targetStage: "discovery",
         },
       },
       context.clock,

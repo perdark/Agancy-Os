@@ -1,2 +1,2 @@
 export * from "./types";
-export * from "./genesis.agent";
+export * from "./discovery.agent";

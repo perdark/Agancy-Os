@@ -141,8 +141,7 @@ export function GenesisForm() {
           {isPending ? "Creating…" : "Create project"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Genesis captures the brief and runs the (placeholder) generation
-          pipeline.
+          Captures the brief and runs Discovery to decode it.
         </p>
       </div>
     </form>

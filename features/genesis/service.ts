@@ -5,8 +5,8 @@ import {
   createProject,
   recordStageResult,
   withHistory,
+  type DiscoveryOutput,
   type GenesisInput,
-  type GenesisOutput,
   type Project,
   type ProjectIdentity,
   type StageResult,
@@ -15,7 +15,7 @@ import { getContainer } from "@/lib/container";
 
 export interface GenesisResult {
   readonly project: Project;
-  readonly stageResult: StageResult<GenesisOutput>;
+  readonly stageResult: StageResult<DiscoveryOutput>;
 }
 
 /**
@@ -26,19 +26,19 @@ export interface GenesisResult {
  *
  *   1. Turn the validated brief into a Project (identity → aggregate).
  *   2. Attach any provided assets.
- *   3. Run the GenesisGenerator (a placeholder in V1) to produce the Stage
- *      Contract output.
+ *   3. Run the DiscoveryGenerator (Claude, or the placeholder fallback) to
+ *      produce the Discovery Stage Contract.
  *   4. Record the result on the workflow and log history.
  *   5. Persist through the repository port.
  *
  * Because it depends only on ports (resolved from the container), swapping the
- * placeholder generator or the in-memory repository for real implementations
- * requires no change here.
+ * generator or the in-memory repository for real implementations requires no
+ * change here.
  */
 export const runGenesis = async (
   input: GenesisInput,
 ): Promise<GenesisResult> => {
-  const { context, projects, genesisGenerator } = getContainer();
+  const { context, projects, discoveryGenerator } = getContainer();
 
   const identity: ProjectIdentity = {
     businessName: input.businessName,
@@ -67,7 +67,7 @@ export const runGenesis = async (
     };
   }
 
-  const stageResult = await genesisGenerator.generate(input, context);
+  const stageResult = await discoveryGenerator.generate(input, context);
 
   project = {
     ...project,
