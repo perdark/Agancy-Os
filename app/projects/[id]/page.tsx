@@ -8,6 +8,7 @@ import {
 import { getProject } from "@/features/projects/service";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
+import { GenerationStatus } from "@/features/genesis/components/generation-status";
 import { GenesisOutputView } from "@/features/genesis/components/genesis-output-view";
 import { PrototypeOutputView } from "@/features/genesis/components/prototype-output-view";
 import {
@@ -55,6 +56,7 @@ export default async function ProjectDetailPage({
           Workflow
         </h2>
         <WorkflowTimeline workflow={project.workflow} />
+        <GenerationStatus projectId={project.id} workflow={project.workflow} />
       </section>
 
       <section className="space-y-3">

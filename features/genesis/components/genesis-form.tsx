@@ -24,6 +24,7 @@ export function GenesisForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
+  const [failedProjectId, setFailedProjectId] = useState<string | null>(null);
 
   const {
     register,
@@ -45,12 +46,15 @@ export function GenesisForm() {
 
   const onSubmit = (values: GenesisFormValues) => {
     setFormError(null);
+    setFailedProjectId(null);
     startTransition(async () => {
       const result = await createProjectFromGenesis(values);
       if (result.ok) {
         router.push(`/projects/${result.projectId}`);
       } else {
         setFormError(result.error);
+        // A stage failure still saved the draft — offer the retry path.
+        setFailedProjectId(result.projectId ?? null);
       }
     });
   };
@@ -133,6 +137,19 @@ export function GenesisForm() {
       {formError ? (
         <p className="text-sm text-red-600" role="alert">
           {formError}
+          {failedProjectId ? (
+            <>
+              {" "}
+              Your draft was saved —{" "}
+              <a
+                className="font-medium underline underline-offset-2"
+                href={`/projects/${failedProjectId}`}
+              >
+                open it to resume
+              </a>
+              .
+            </>
+          ) : null}
         </p>
       ) : null}
 
