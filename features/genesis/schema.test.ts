@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   GENESIS_INPUT_LIMITS,
+  genesisEvidenceUploadBatchSchema,
   genesisInputSchema,
+  genesisLogoUploadSchema,
   genesisUploadBatchSchema,
 } from "./schema";
 
@@ -159,6 +161,44 @@ describe("genesisInputSchema", () => {
         ...validInput,
         assets: [{ ...asset, uri: "file:///tmp/private-logo.png" }],
       }).success,
+    ).toBe(false);
+  });
+
+  it("marks linked assets as operator-provided references", () => {
+    const parsed = genesisInputSchema.parse(validInput);
+
+    expect(parsed.assets[0]).toMatchObject({
+      label: "Lotus logo",
+      kind: "reference",
+      source: "operator-link",
+      uri: "https://example.com/lotus-logo.png",
+    });
+  });
+
+  it("accepts only image uploads as a logo", () => {
+    const logo = { name: "logo.png", mimeType: "image/png", sizeBytes: 1024 };
+
+    expect(genesisLogoUploadSchema.safeParse(logo).success).toBe(true);
+    expect(
+      genesisLogoUploadSchema.safeParse({ ...logo, mimeType: "application/pdf" })
+        .success,
+    ).toBe(false);
+    expect(
+      genesisLogoUploadSchema.safeParse({ ...logo, mimeType: "text/html" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("accepts image and PDF evidence but rejects other file types", () => {
+    const image = { name: "menu.jpg", mimeType: "image/jpeg", sizeBytes: 512 };
+    const pdf = { name: "menu.pdf", mimeType: "application/pdf", sizeBytes: 512 };
+    const page = { name: "page.html", mimeType: "text/html", sizeBytes: 512 };
+
+    expect(
+      genesisEvidenceUploadBatchSchema.safeParse([image, pdf]).success,
+    ).toBe(true);
+    expect(
+      genesisEvidenceUploadBatchSchema.safeParse([image, page]).success,
     ).toBe(false);
   });
 

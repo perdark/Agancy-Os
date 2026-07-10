@@ -28,3 +28,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
+
+# local data (uploaded asset bytes — see lib/adapters/local-asset-storage.ts)
+/.data/

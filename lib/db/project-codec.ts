@@ -4,6 +4,7 @@ import {
   asDocumentId,
   asHistoryEventId,
   asProjectId,
+  ASSET_SOURCES,
   PRICE_LEVELS,
   readinessScore,
   STAGE_KINDS,
@@ -135,6 +136,11 @@ const asset = z.object({
   kind: z.enum(["logo", "image", "document", "reference", "other"]),
   uri: z.string(),
   mimeType: z.string().optional(),
+  // Rows written before uploads existed only ever held operator links.
+  source: z.enum(ASSET_SOURCES).default("operator-link"),
+  checksum: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  fileName: z.string().optional(),
   addedAt: date,
 });
 

@@ -98,9 +98,13 @@ export const runGenesisDraftFirst = async (
       assets: input.assets.map((asset) => ({
         id: asAssetId(ids.next()),
         label: asset.label,
-        kind: "reference" as const,
+        kind: asset.kind,
+        source: asset.source,
         uri: asset.uri,
         mimeType: asset.mimeType,
+        checksum: asset.checksum,
+        sizeBytes: asset.sizeBytes,
+        fileName: asset.fileName,
         addedAt: now,
       })),
     };
@@ -143,8 +147,13 @@ const rebuildGenesisInput = (project: Project): GenesisInput => ({
   notes: project.identity.notes,
   assets: project.assets.map((asset) => ({
     label: asset.label,
+    kind: asset.kind,
+    source: asset.source,
     uri: asset.uri,
     mimeType: asset.mimeType,
+    checksum: asset.checksum,
+    sizeBytes: asset.sizeBytes,
+    fileName: asset.fileName,
   })),
 });
 

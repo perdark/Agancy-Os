@@ -1,6 +1,8 @@
 import "server-only";
+import { join } from "node:path";
 import {
   systemClock,
+  type AssetStorage,
   type Clock,
   type DiscoveryGenerator,
   type ProjectRepository,
@@ -23,6 +25,7 @@ import {
 } from "./ai/cli-runtime-policy";
 import { cryptoIdGenerator } from "./adapters/id-generator";
 import { InMemoryProjectRepository } from "./adapters/in-memory-project-repository";
+import { LocalAssetStorage } from "./adapters/local-asset-storage";
 import { DrizzleProjectRepository } from "./db/drizzle-project-repository";
 import { resolvePersistenceBackend } from "./db/persistence-policy";
 
@@ -54,9 +57,19 @@ export interface Container {
   readonly discoveryGenerator: DiscoveryGenerator;
   readonly prototypeGenerator: PrototypeGenerator;
   readonly stages: StageRegistry;
+  /** Byte storage for uploaded assets (logos, evidence). */
+  readonly assetStorage: AssetStorage;
   /** Which AI transport the generators ride; recorded in run diagnostics. */
   readonly aiBackend: AiBackend;
 }
+
+/**
+ * Uploaded bytes live on the local disk (single-operator machine), in a
+ * content-addressed directory. `AGENCY_ASSET_DIR` relocates it; the default
+ * sits inside the project under git-ignored `.data/`.
+ */
+const resolveAssetDir = (): string =>
+  process.env.AGENCY_ASSET_DIR?.trim() || join(process.cwd(), ".data", "assets");
 
 const buildGenerators = (
   backend: AiBackend,
@@ -99,6 +112,7 @@ export const getContainer = (): Container => {
     discoveryGenerator,
     prototypeGenerator,
     stages: buildStageRegistry(),
+    assetStorage: new LocalAssetStorage(resolveAssetDir()),
     aiBackend,
   };
 

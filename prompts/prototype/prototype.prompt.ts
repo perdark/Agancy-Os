@@ -1,6 +1,7 @@
 import {
   PRICE_LEVEL_LABELS,
   type DiscoveryOutput,
+  type GenesisAssetInput,
   type GenesisInput,
   type StageResult,
 } from "@/domain";
@@ -54,9 +55,21 @@ export const MANDATED_OPENING =
  * short hard floor, not a doctrine wall — the thin prompt + world + logo is
  * what closed the Khatuna deal.
  */
+/**
+ * One ATTACHED ASSETS line per asset. An uploaded file is described by name —
+ * its internal `asset://` pointer means nothing outside Agency OS — while a
+ * pasted link keeps its URL as citable evidence.
+ */
+const describeAsset = (asset: GenesisAssetInput): string =>
+  asset.source === "operator-upload"
+    ? `- ${asset.label} (${asset.kind} — uploaded file ${
+        asset.fileName ?? "attached"
+      }; the operator attaches it in Claude Design)`
+    : `- ${asset.label} (link: ${asset.uri})`;
+
 export const prototypePrompt = definePrompt<PrototypePromptVariables>({
   id: "prototype.first-meeting-kit",
-  version: "0.1.0",
+  version: "0.1.1",
   description:
     "Turn the brief and Discovery's decode into the first-meeting kit: brand assumptions, positioning, prototype direction with world facts, and a ready-to-paste Claude Design prompt.",
   render: ({ input, discovery }) => {
@@ -69,7 +82,7 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
     );
     const assets =
       input.assets.length > 0
-        ? input.assets.map((a) => `- ${a.label}`)
+        ? input.assets.map(describeAsset)
         : [
             "- (none attached — the operator will attach the client's logo in Claude Design)",
           ];

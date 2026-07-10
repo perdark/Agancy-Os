@@ -6,6 +6,7 @@ import {
   type StageResult,
 } from "@/domain";
 import { getProject } from "@/features/projects/service";
+import { EvidenceCard } from "@/features/projects/components/evidence-card";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
 import { GenerationStatus } from "@/features/genesis/components/generation-status";
@@ -80,6 +81,7 @@ export default async function ProjectDetailPage({
             ) : null}
           </CardContent>
         </Card>
+        <EvidenceCard projectId={project.id} assets={project.assets} />
       </section>
 
       {genesis ? (

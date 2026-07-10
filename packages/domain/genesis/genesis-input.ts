@@ -1,3 +1,4 @@
+import type { AssetKind, AssetSource } from "../project/assets";
 import type { PriceLevel } from "../project/identity";
 
 /**
@@ -21,8 +22,18 @@ export interface GenesisInput {
   readonly assets: readonly GenesisAssetInput[];
 }
 
+/**
+ * An asset arriving with the brief. Uploads have already been written through
+ * the {@link AssetStorage} port by the time this exists — the input carries the
+ * resulting pointer and integrity metadata, never raw bytes.
+ */
 export interface GenesisAssetInput {
   readonly label: string;
+  readonly kind: AssetKind;
+  readonly source: AssetSource;
   readonly uri: string;
   readonly mimeType?: string;
+  readonly checksum?: string;
+  readonly sizeBytes?: number;
+  readonly fileName?: string;
 }

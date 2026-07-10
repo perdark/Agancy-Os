@@ -3,6 +3,7 @@ export * from "./discovery";
 export * from "./knowledge";
 export * from "./documents";
 export * from "./assets";
+export * from "./asset-storage";
 export * from "./history";
 export * from "./project";
 export * from "./repository";

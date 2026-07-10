@@ -1,7 +1,26 @@
 # HANDOFF — session state
 
-**Date:** 2026-07-10 (evening session, Claude/Fable 5)
+**Date:** 2026-07-11 (Claude/Fable 5; owner continuing from mobile)
 **Branch:** `claude/agency-os-foundation-gr9yso`
+
+## Update 2026-07-11 — Step 3 committed, needs browser verification
+
+The logo/evidence-upload slice (guide §11 task 4) is now committed:
+
+- Intake form accepts a real logo upload and evidence files (images/PDF),
+  with client-side MIME/size/count validation and previews.
+- Asset bytes travel as multipart FormData through the intake action, are
+  stored via an asset-storage port (`packages/domain/project/asset-storage.ts`)
+  with a local-filesystem adapter writing under gitignored `/.data/`.
+- Assets keep kind, MIME type, checksum, and source; served back through
+  `app/api/assets/[projectId]/[assetId]/route.ts` (`features/projects/serve-asset.ts`).
+- Evidence card on the project page previews stored assets.
+- 151 tests pass (25 new), typecheck and lint clean.
+
+**Remaining before Step 3 is DONE:** browser-verify the upload flow
+end-to-end (upload logo + evidence → generate → previews render → bytes
+survive under `.data/`), per guide §10. Then next in order: guide §11
+task 5 — artifact import, mockup first on the project screen.
 
 ## Read first
 

@@ -30,9 +30,20 @@ const input: GenesisInput = {
   notes: "near a college",
   assets: [
     {
-      label: "Logo",
-      uri: "https://example.com/logo.png",
+      label: "Lotus logo",
+      kind: "logo",
+      source: "operator-upload",
+      uri: `asset://${"a".repeat(64)}`,
       mimeType: "image/png",
+      checksum: "a".repeat(64),
+      sizeBytes: 2_048,
+      fileName: "lotus-logo.png",
+    },
+    {
+      label: "Instagram",
+      kind: "reference",
+      source: "operator-link",
+      uri: "https://instagram.com/lotus.cafe",
     },
   ],
 };
@@ -183,10 +194,34 @@ describe("runGenesisDraftFirst", () => {
 
     const draft = repository.saves[0]!;
     expect(draft.identity.businessName).toBe("Lotus Cafe");
-    expect(draft.assets).toHaveLength(1);
+    expect(draft.assets).toHaveLength(2);
     expect(draft.workflow.runs.discovery?.status).toBe("queued");
     expect(draft.workflow.runs.prototype?.status).toBe("queued");
     expect(draft.workflow.results).toEqual({});
+  });
+
+  it("attaches assets with their kind, source, and upload metadata", async () => {
+    const { deps } = makeDeps();
+
+    const { project } = await runGenesisDraftFirst(input, deps);
+
+    expect(project.assets).toHaveLength(2);
+    expect(project.assets[0]).toMatchObject({
+      label: "Lotus logo",
+      kind: "logo",
+      source: "operator-upload",
+      uri: `asset://${"a".repeat(64)}`,
+      mimeType: "image/png",
+      checksum: "a".repeat(64),
+      sizeBytes: 2_048,
+      fileName: "lotus-logo.png",
+    });
+    expect(project.assets[1]).toMatchObject({
+      label: "Instagram",
+      kind: "reference",
+      source: "operator-link",
+      uri: "https://instagram.com/lotus.cafe",
+    });
   });
 
   it("persists every stage transition independently", async () => {

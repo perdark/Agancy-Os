@@ -33,6 +33,28 @@ describe("project codec", () => {
     expect(revived.knowledge.entries[0]?.recordedAt).toBeInstanceOf(Date);
   });
 
+  it("defaults asset source to operator-link for rows persisted before uploads existed", () => {
+    const row = throughDatabase(toProjectRow(buildMaximalProject()));
+    const legacy = {
+      ...row,
+      assets: [
+        {
+          id: "asset-1",
+          label: "Logo",
+          kind: "logo",
+          uri: "https://example.com/logo.png",
+          mimeType: "image/png",
+          addedAt: "2026-07-10T09:00:03.000Z",
+        },
+      ],
+    } as unknown as ProjectRow;
+
+    expect(toProject(legacy).assets[0]).toMatchObject({
+      label: "Logo",
+      source: "operator-link",
+    });
+  });
+
   it("defaults runs to empty for rows persisted before run-tracking existed", () => {
     const row = throughDatabase(toProjectRow(buildMaximalProject()));
     const legacy = { ...row, workflowRuns: null } as unknown as ProjectRow;

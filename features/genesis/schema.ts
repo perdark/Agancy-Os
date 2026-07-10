@@ -49,24 +49,51 @@ const boundedText = (label: string, max: number) =>
  * schema is asserted to produce exactly that, so drift between the form and the
  * domain is a compile error, not a runtime surprise.
  */
-export const genesisAssetSchema = z.object({
-  label: requiredText("Asset label", GENESIS_INPUT_LIMITS.assetLabel),
-  uri: requiredText("Asset URL", GENESIS_INPUT_LIMITS.assetUri).pipe(
-    z
-      .string()
-      .url("Asset URL must be a valid URL")
-      .refine(
-        (value) => /^https?:\/\//i.test(value),
-        "Asset URL must use HTTP or HTTPS",
-      ),
-  ),
-  mimeType: boundedText(
-    "Asset MIME type",
-    GENESIS_INPUT_LIMITS.assetMimeType,
-  )
-    .optional()
-    .transform((value) => value || undefined),
-});
+export const genesisAssetSchema = z
+  .object({
+    label: requiredText("Asset label", GENESIS_INPUT_LIMITS.assetLabel),
+    uri: requiredText("Asset URL", GENESIS_INPUT_LIMITS.assetUri).pipe(
+      z
+        .string()
+        .url("Asset URL must be a valid URL")
+        .refine(
+          (value) => /^https?:\/\//i.test(value),
+          "Asset URL must use HTTP or HTTPS",
+        ),
+    ),
+    mimeType: boundedText(
+      "Asset MIME type",
+      GENESIS_INPUT_LIMITS.assetMimeType,
+    )
+      .optional()
+      .transform((value) => value || undefined),
+  })
+  // A URL the operator pasted is evidence *about* the prospect, not bytes we
+  // hold — always a linked reference. Uploads never pass through this schema;
+  // they are mapped from stored files in the server action.
+  .transform((asset) => ({
+    ...asset,
+    kind: "reference" as const,
+    source: "operator-link" as const,
+  }));
+
+/**
+ * Upload MIME allowlists. Logos must be renderable images; evidence may also
+ * be PDF exports (menus, price lists). Everything else — HTML, scripts,
+ * archives — is rejected at the edge, before any byte reaches storage.
+ */
+export const GENESIS_LOGO_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+  "image/gif",
+] as const;
+
+export const GENESIS_EVIDENCE_MIME_TYPES = [
+  ...GENESIS_LOGO_MIME_TYPES,
+  "application/pdf",
+] as const;
 
 /**
  * Metadata boundary for uploads. File bytes stay outside Zod; server actions
@@ -88,21 +115,53 @@ export const genesisUploadMetadataSchema = z.object({
     ),
 });
 
-export const genesisUploadBatchSchema = z
-  .array(genesisUploadMetadataSchema)
-  .max(
-    GENESIS_INPUT_LIMITS.assets,
-    `No more than ${GENESIS_INPUT_LIMITS.assets} files may be attached`,
-  )
-  .superRefine((files, context) => {
-    const totalBytes = files.reduce((total, file) => total + file.sizeBytes, 0);
-    if (totalBytes > GENESIS_INPUT_LIMITS.totalAssetFileBytes) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Uploaded files must total ${GENESIS_INPUT_LIMITS.totalAssetFileBytes} bytes or less`,
-      });
-    }
-  });
+const allowedMime = (allowlist: readonly string[]) =>
+  z
+    .string()
+    .refine(
+      (value) => allowlist.includes(value.toLowerCase()),
+      `File type must be one of: ${allowlist.join(", ")}`,
+    );
+
+export const genesisLogoUploadSchema = genesisUploadMetadataSchema.extend({
+  mimeType: genesisUploadMetadataSchema.shape.mimeType.pipe(
+    allowedMime(GENESIS_LOGO_MIME_TYPES),
+  ),
+});
+
+export const genesisEvidenceUploadSchema = genesisUploadMetadataSchema.extend({
+  mimeType: genesisUploadMetadataSchema.shape.mimeType.pipe(
+    allowedMime(GENESIS_EVIDENCE_MIME_TYPES),
+  ),
+});
+
+const boundedUploadBatch = <Schema extends z.ZodTypeAny>(schema: Schema) =>
+  z
+    .array(schema)
+    .max(
+      GENESIS_INPUT_LIMITS.assets,
+      `No more than ${GENESIS_INPUT_LIMITS.assets} files may be attached`,
+    )
+    .superRefine((files: readonly { sizeBytes: number }[], context) => {
+      const totalBytes = files.reduce(
+        (total, file) => total + file.sizeBytes,
+        0,
+      );
+      if (totalBytes > GENESIS_INPUT_LIMITS.totalAssetFileBytes) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Uploaded files must total ${GENESIS_INPUT_LIMITS.totalAssetFileBytes} bytes or less`,
+        });
+      }
+    });
+
+export const genesisEvidenceUploadBatchSchema = boundedUploadBatch(
+  genesisEvidenceUploadSchema,
+);
+
+export const genesisUploadBatchSchema = boundedUploadBatch(
+  genesisUploadMetadataSchema,
+);
 
 export const genesisInputSchema = z.object({
   businessName: requiredText(
