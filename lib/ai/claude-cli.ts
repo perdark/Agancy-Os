@@ -25,30 +25,86 @@ interface ClaudeEnvelope {
   readonly structured_output?: unknown;
 }
 
+/**
+ * Minimal environment needed to locate the CLI, read the operator's local
+ * subscription credentials, preserve locale, and reach Anthropic through
+ * common proxy/TLS setups. Everything else is denied by default.
+ */
+export const CLAUDE_CHILD_ENV_ALLOWLIST = [
+  "NODE_ENV",
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LANGUAGE",
+  "LC_ALL",
+  "LC_CTYPE",
+  "XDG_CONFIG_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME",
+  "XDG_RUNTIME_DIR",
+  "CLAUDE_CONFIG_DIR",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+] as const;
+
+export const buildClaudeChildEnv = (
+  source: Readonly<Record<string, string | undefined>>,
+): NodeJS.ProcessEnv => {
+  const sourceNodeEnv = source.NODE_ENV;
+  const nodeEnv =
+    sourceNodeEnv === "production" ||
+    sourceNodeEnv === "test" ||
+    sourceNodeEnv === "development"
+      ? sourceNodeEnv
+      : "development";
+  const childEnv: NodeJS.ProcessEnv = { NODE_ENV: nodeEnv };
+
+  for (const name of CLAUDE_CHILD_ENV_ALLOWLIST) {
+    if (name === "NODE_ENV") continue;
+    const value = source[name];
+    if (value !== undefined) childEnv[name] = value;
+  }
+
+  return childEnv;
+};
+
+export interface ClaudeExecOptions {
+  readonly timeoutMs: number;
+  readonly env: NodeJS.ProcessEnv;
+}
+
 /** Injectable spawn boundary so tests never launch a real CLI. */
 export type ClaudeExec = (
   args: readonly string[],
   stdin: string,
-  timeoutMs: number,
+  options: ClaudeExecOptions,
 ) => Promise<{ stdout: string }>;
 
-const realExec: ClaudeExec = (args, stdin, timeoutMs) =>
+const realExec: ClaudeExec = (args, stdin, options) =>
   new Promise((resolve, reject) => {
-    // Subscription auth must win: a set ANTHROPIC_API_KEY silently outranks
-    // OAuth in -p mode — the exact billing this backend exists to avoid.
-    const {
-      ANTHROPIC_API_KEY: _key,
-      ANTHROPIC_AUTH_TOKEN: _token,
-      ...env
-    } = process.env;
-
     const child = execFile(
       "claude",
       args as string[],
       {
         cwd: tmpdir(),
-        env,
-        timeout: timeoutMs,
+        env: options.env,
+        timeout: options.timeoutMs,
         killSignal: "SIGKILL",
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -62,6 +118,8 @@ export interface RunClaudeStructuredOptions {
   readonly prompt: string;
   readonly jsonSchema: Record<string, unknown>;
   readonly timeoutMs?: number;
+  /** Source environment is injectable so the deny-by-default policy is testable. */
+  readonly environment?: Readonly<Record<string, string | undefined>>;
   /** Injectable for tests; defaults to the real `claude` spawn. */
   readonly exec?: ClaudeExec;
 }
@@ -79,10 +137,17 @@ export const runClaudeStructured = async ({
   prompt,
   jsonSchema,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  environment = process.env,
   exec = realExec,
 }: RunClaudeStructuredOptions): Promise<unknown> => {
   const args = [
     "-p",
+    "--safe-mode",
+    "--disable-slash-commands",
+    "--no-session-persistence",
+    "--no-chrome",
+    "--tools",
+    "",
     "--output-format",
     "json",
     "--json-schema",
@@ -94,7 +159,10 @@ export const runClaudeStructured = async ({
 
   let stdout: string;
   try {
-    ({ stdout } = await exec(args, prompt, timeoutMs));
+    ({ stdout } = await exec(args, prompt, {
+      timeoutMs,
+      env: buildClaudeChildEnv(environment),
+    }));
   } catch (cause) {
     const code = (cause as NodeJS.ErrnoException | null)?.code;
     throw new CliGenerationError(

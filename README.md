@@ -33,7 +33,11 @@ Discovery + Prototype generation runs on one of three backends, selected by
 
 - `cli` — the local `claude` CLI (Claude Code) in headless mode, riding your
   Claude subscription and your default model. **Single-operator local use
-  only** — a deployed or multi-user instance must use the API backend.
+  only** — a runtime guard refuses production, known hosting platforms, and
+  explicitly shared environments. A deployed or multi-user instance must use
+  the API backend. The child runs one-shot with tools, customizations, MCP,
+  Chrome integration, slash commands, and session persistence disabled, and
+  receives only an explicit environment allowlist.
 - `api` — the Anthropic API (`ANTHROPIC_API_KEY`).
 - `placeholder` — deterministic placeholders; the app runs with zero setup.
 

@@ -17,6 +17,10 @@ import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
 import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
 import { CliPrototypeGenerator } from "./ai/cli-prototype-generator";
+import {
+  resolveAiBackend,
+  type AiBackend,
+} from "./ai/cli-runtime-policy";
 import { cryptoIdGenerator } from "./adapters/id-generator";
 import { InMemoryProjectRepository } from "./adapters/in-memory-project-repository";
 
@@ -43,16 +47,6 @@ export interface Container {
   readonly prototypeGenerator: PrototypeGenerator;
   readonly stages: StageRegistry;
 }
-
-type AiBackend = "cli" | "api" | "placeholder";
-
-const resolveBackend = (): AiBackend => {
-  const explicit = process.env.AGENCY_AI_BACKEND;
-  if (explicit === "cli" || explicit === "api" || explicit === "placeholder") {
-    return explicit;
-  }
-  return process.env.ANTHROPIC_API_KEY ? "api" : "placeholder";
-};
 
 const buildGenerators = (
   backend: AiBackend,
@@ -81,7 +75,7 @@ export const getContainer = (): Container => {
   };
 
   const [discoveryGenerator, prototypeGenerator] = buildGenerators(
-    resolveBackend(),
+    resolveAiBackend(),
   );
 
   container = {

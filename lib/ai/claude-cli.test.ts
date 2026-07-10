@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildClaudeChildEnv,
   CliGenerationError,
   runClaudeStructured,
   type ClaudeExec,
+  type ClaudeExecOptions,
 } from "./claude-cli";
 
 const schema = { type: "object" } as const;
@@ -15,27 +17,78 @@ const okEnvelope = JSON.stringify({
 });
 
 describe("runClaudeStructured", () => {
-  it("returns structured_output and passes the schema + prompt to the CLI", async () => {
+  it("uses the exact isolated one-shot arguments and allowlisted environment", async () => {
     let seenArgs: readonly string[] = [];
     let seenStdin = "";
-    const exec: ClaudeExec = async (args, stdin) => {
+    let seenOptions: ClaudeExecOptions | undefined;
+    const exec: ClaudeExec = async (args, stdin, options) => {
       seenArgs = args;
       seenStdin = stdin;
+      seenOptions = options;
       return { stdout: okEnvelope };
+    };
+    const environment = {
+      NODE_ENV: "test",
+      PATH: "/test/bin",
+      HOME: "/home/operator",
+      LANG: "C.UTF-8",
+      CLAUDE_CODE_OAUTH_TOKEN: "subscription-oauth-token",
+      ANTHROPIC_API_KEY: "must-not-reach-child",
+      ANTHROPIC_AUTH_TOKEN: "must-not-reach-child",
+      DATABASE_URL: "postgresql://must-not-reach-child",
     };
 
     const result = await runClaudeStructured({
       prompt: "decode this",
       jsonSchema: schema,
+      environment,
       exec,
     });
 
     expect(result).toEqual({ hello: "world" });
     expect(seenStdin).toBe("decode this");
-    expect(seenArgs).toContain("-p");
-    expect(seenArgs).toContain("--json-schema");
-    expect(seenArgs).toContain(JSON.stringify(schema));
-    expect(seenArgs).toContain("--strict-mcp-config");
+    expect(seenArgs).toEqual([
+      "-p",
+      "--safe-mode",
+      "--disable-slash-commands",
+      "--no-session-persistence",
+      "--no-chrome",
+      "--tools",
+      "",
+      "--output-format",
+      "json",
+      "--json-schema",
+      JSON.stringify(schema),
+      "--strict-mcp-config",
+      "--mcp-config",
+      '{"mcpServers":{}}',
+    ]);
+    expect(seenOptions).toEqual({
+      timeoutMs: 180_000,
+      env: {
+        NODE_ENV: "test",
+        PATH: "/test/bin",
+        HOME: "/home/operator",
+        LANG: "C.UTF-8",
+        CLAUDE_CODE_OAUTH_TOKEN: "subscription-oauth-token",
+      },
+    });
+  });
+
+  it("denies unlisted environment variables by default", () => {
+    expect(
+      buildClaudeChildEnv({
+        PATH: "/bin",
+        HTTPS_PROXY: "https://proxy.example",
+        NODE_OPTIONS: "--require=/tmp/untrusted.cjs",
+        "CLAUDE.md": "not-a-real-safe-variable",
+        ANTHROPIC_API_KEY: "api-key",
+      }),
+    ).toEqual({
+      NODE_ENV: "development",
+      PATH: "/bin",
+      HTTPS_PROXY: "https://proxy.example",
+    });
   });
 
   it("maps ENOENT to a claude-not-found error", async () => {
