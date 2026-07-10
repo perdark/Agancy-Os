@@ -138,10 +138,11 @@ export function GenesisForm() {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Creating…" : "Create project"}
+          {isPending ? "Building first-meeting kit…" : "Create project"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Captures the brief and runs Discovery to decode it.
+          Decodes the brief, then builds the first-meeting kit (two AI steps,
+          ≈30–60s).
         </p>
       </div>
     </form>

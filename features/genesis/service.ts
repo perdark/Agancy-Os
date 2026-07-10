@@ -9,13 +9,15 @@ import {
   type GenesisInput,
   type Project,
   type ProjectIdentity,
+  type PrototypeOutput,
   type StageResult,
 } from "@/domain";
 import { getContainer } from "@/lib/container";
 
 export interface GenesisResult {
   readonly project: Project;
-  readonly stageResult: StageResult<DiscoveryOutput>;
+  readonly discoveryResult: StageResult<DiscoveryOutput>;
+  readonly prototypeResult: StageResult<PrototypeOutput>;
 }
 
 /**
@@ -27,18 +29,22 @@ export interface GenesisResult {
  *   1. Turn the validated brief into a Project (identity → aggregate).
  *   2. Attach any provided assets.
  *   3. Run the DiscoveryGenerator (Claude, or the placeholder fallback) to
- *      produce the Discovery Stage Contract.
- *   4. Record the result on the workflow and log history.
- *   5. Persist through the repository port.
+ *      decode the brief into the Discovery Stage Contract.
+ *   4. Run the PrototypeGenerator on the brief + Discovery's full result to
+ *      build the first-meeting kit.
+ *   5. Record both results on the workflow and log history for each.
+ *   6. Persist through the repository port.
  *
- * Because it depends only on ports (resolved from the container), swapping the
- * generator or the in-memory repository for real implementations requires no
- * change here.
+ * The sequence is atomic on purpose: if either generator throws, nothing is
+ * persisted — a half-born project would be dishonest. Because this depends
+ * only on ports (resolved from the container), swapping any generator or the
+ * in-memory repository requires no change here.
  */
 export const runGenesis = async (
   input: GenesisInput,
 ): Promise<GenesisResult> => {
-  const { context, projects, discoveryGenerator } = getContainer();
+  const { context, projects, discoveryGenerator, prototypeGenerator } =
+    getContainer();
 
   const identity: ProjectIdentity = {
     businessName: input.businessName,
@@ -67,21 +73,36 @@ export const runGenesis = async (
     };
   }
 
-  const stageResult = await discoveryGenerator.generate(input, context);
+  const discoveryResult = await discoveryGenerator.generate(input, context);
+  const prototypeResult = await prototypeGenerator.generate(
+    input,
+    discoveryResult,
+    context,
+  );
 
   project = {
     ...project,
-    workflow: recordStageResult(project.workflow, stageResult),
+    workflow: recordStageResult(
+      recordStageResult(project.workflow, discoveryResult),
+      prototypeResult,
+    ),
   };
   project = withHistory(project, {
     id: asHistoryEventId(context.ids.next()),
     type: "stage.run",
-    stage: stageResult.stage,
-    readiness: stageResult.readiness,
-    at: stageResult.producedAt,
+    stage: discoveryResult.stage,
+    readiness: discoveryResult.readiness,
+    at: discoveryResult.producedAt,
+  });
+  project = withHistory(project, {
+    id: asHistoryEventId(context.ids.next()),
+    type: "stage.run",
+    stage: prototypeResult.stage,
+    readiness: prototypeResult.readiness,
+    at: prototypeResult.producedAt,
   });
 
   await projects.save(project);
 
-  return { project, stageResult };
+  return { project, discoveryResult, prototypeResult };
 };

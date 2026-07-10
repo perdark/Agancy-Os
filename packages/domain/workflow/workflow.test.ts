@@ -19,6 +19,15 @@ const discoveryResult = buildStageResult(
   },
   clock,
 );
+const prototypeResult = buildStageResult(
+  {
+    stage: "prototype",
+    output: null,
+    readiness: 70,
+    nextStep: { headline: "Next", detail: "Do the thing" },
+  },
+  clock,
+);
 
 describe("workflow", () => {
   it("starts in Discovery with no recorded results", () => {
@@ -39,5 +48,15 @@ describe("workflow", () => {
     const after = advanceTo(before, "brand");
     expect(after.currentStage).toBe("brand");
     expect(before.currentStage).toBe("discovery");
+  });
+
+  it("records multiple stages independently", () => {
+    let workflow = recordStageResult(initialWorkflow(), discoveryResult);
+    workflow = recordStageResult(workflow, prototypeResult);
+
+    expect(stageStatus(workflow, "discovery")).toBe("done");
+    expect(stageStatus(workflow, "prototype")).toBe("done");
+    expect(stageStatus(workflow, "brand")).toBe("upcoming");
+    expect(completionRatio(workflow)).toBeCloseTo(2 / 7);
   });
 });
