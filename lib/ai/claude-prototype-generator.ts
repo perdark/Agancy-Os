@@ -15,6 +15,7 @@ import {
   toPrototypeStageResult,
   type DecodedPrototype,
 } from "./prototype-codec";
+import { hashPrompt } from "./prompt-hash";
 
 /**
  * The model that builds the first-meeting kit. Same tier as Discovery: fast,
@@ -43,14 +44,23 @@ export class ClaudePrototypeGenerator implements PrototypeGenerator {
     discovery: StageResult<DiscoveryOutput>,
     context: StageContext,
   ): Promise<StageResult<PrototypeOutput>> {
+    const rendered = prototypePrompt.render({ input, discovery });
+    // Prompt identity is reported before the call so failed runs still carry it.
+    context.probe?.report({
+      promptId: prototypePrompt.id,
+      promptVersion: prototypePrompt.version,
+      promptHash: hashPrompt(rendered),
+    });
+
     let decoded: DecodedPrototype;
     try {
-      const { object } = await generateObject({
+      const { object, response } = await generateObject({
         model: anthropic(PROTOTYPE_MODEL),
         schema: prototypeSchema,
-        prompt: prototypePrompt.render({ input, discovery }),
+        prompt: rendered,
       });
       decoded = object;
+      context.probe?.report({ model: response?.modelId ?? PROTOTYPE_MODEL });
     } catch (cause) {
       throw new PrototypeGenerationError(
         "The AI could not build the first-meeting kit. Check your ANTHROPIC_API_KEY and try again.",

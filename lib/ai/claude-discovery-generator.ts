@@ -14,6 +14,7 @@ import {
   toDiscoveryStageResult,
   type DecodedDiscovery,
 } from "./discovery-codec";
+import { hashPrompt } from "./prompt-hash";
 
 /**
  * The model that decodes a brief. Sonnet is fast and cheap and more than strong
@@ -42,14 +43,23 @@ export class ClaudeDiscoveryGenerator implements DiscoveryGenerator {
     input: GenesisInput,
     context: StageContext,
   ): Promise<StageResult<DiscoveryOutput>> {
+    const rendered = discoveryPrompt.render(input);
+    // Prompt identity is reported before the call so failed runs still carry it.
+    context.probe?.report({
+      promptId: discoveryPrompt.id,
+      promptVersion: discoveryPrompt.version,
+      promptHash: hashPrompt(rendered),
+    });
+
     let decoded: DecodedDiscovery;
     try {
-      const { object } = await generateObject({
+      const { object, response } = await generateObject({
         model: anthropic(DISCOVERY_MODEL),
         schema: discoverySchema,
-        prompt: discoveryPrompt.render(input),
+        prompt: rendered,
       });
       decoded = object;
+      context.probe?.report({ model: response?.modelId ?? DISCOVERY_MODEL });
     } catch (cause) {
       throw new DiscoveryGenerationError(
         "The AI could not decode this brief. Check your ANTHROPIC_API_KEY and try again.",

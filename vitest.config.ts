@@ -11,6 +11,9 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: [
+      // `server-only` throws outside an RSC module graph; stub it so server
+      // modules stay unit-testable in Node.
+      { find: /^server-only$/, replacement: `${root}test-stubs/server-only.ts` },
       { find: /^@\/domain$/, replacement: `${root}packages/domain` },
       { find: /^@\/domain\//, replacement: `${root}packages/domain/` },
       { find: /^@\/stages$/, replacement: `${root}packages/stages` },

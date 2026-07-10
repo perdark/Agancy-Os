@@ -7,12 +7,17 @@ import type {
   StageResult,
 } from "@/domain";
 import { discoveryPrompt } from "@/prompts";
-import { CliGenerationError, runClaudeStructured } from "./claude-cli";
+import {
+  CliGenerationError,
+  runClaudeStructured,
+  type ClaudeExec,
+} from "./claude-cli";
 import {
   DISCOVERY_JSON_SCHEMA,
   discoverySchema,
   toDiscoveryStageResult,
 } from "./discovery-codec";
+import { hashPrompt } from "./prompt-hash";
 
 /**
  * CliDiscoveryGenerator — the local-CLI transport of the Discovery port.
@@ -22,16 +27,28 @@ import {
  * operator's subscription and default model. Single-operator local use only.
  */
 export class CliDiscoveryGenerator implements DiscoveryGenerator {
+  constructor(private readonly exec?: ClaudeExec) {}
+
   async generate(
     input: GenesisInput,
     context: StageContext,
   ): Promise<StageResult<DiscoveryOutput>> {
-    const raw = await runClaudeStructured({
-      prompt: discoveryPrompt.render(input),
-      jsonSchema: DISCOVERY_JSON_SCHEMA,
+    const rendered = discoveryPrompt.render(input);
+    // Prompt identity is reported before the call so failed runs still carry it.
+    context.probe?.report({
+      promptId: discoveryPrompt.id,
+      promptVersion: discoveryPrompt.version,
+      promptHash: hashPrompt(rendered),
     });
 
-    const parsed = discoverySchema.safeParse(raw);
+    const raw = await runClaudeStructured({
+      prompt: rendered,
+      jsonSchema: DISCOVERY_JSON_SCHEMA,
+      exec: this.exec,
+    });
+    if (raw.model) context.probe?.report({ model: raw.model });
+
+    const parsed = discoverySchema.safeParse(raw.output);
     if (!parsed.success) {
       throw new CliGenerationError(
         "The claude CLI output did not match the Discovery shape.",
