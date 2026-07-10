@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "id": "khatuna",
+  "displayName": "Khatuna",
+  "role": "protected-baseline",
+  "handling": "protected",
+  "knownFacts": [
+    {
+      "id": "thin-input-and-logo",
+      "statement": "The winning workflow began with a small amount of information and a logo.",
+      "scope": "historical-winning-workflow",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 38,
+        "lineEnd": 41
+      }
+    },
+    {
+      "id": "fable-five-mockup",
+      "statement": "Fable 5 produced a finished-looking, high-quality application mockup.",
+      "scope": "historical-winning-workflow",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 40,
+        "lineEnd": 41
+      }
+    },
+    {
+      "id": "first-meeting-presentation",
+      "statement": "The operator showed the mockup at the first client meeting.",
+      "scope": "historical-winning-workflow",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 42,
+        "lineEnd": 42
+      }
+    },
+    {
+      "id": "no-client-design-edits",
+      "statement": "The client requested no design edits.",
+      "scope": "historical-winning-workflow",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 43,
+        "lineEnd": 43
+      }
+    },
+    {
+      "id": "deal-closed",
+      "statement": "The guide records that the quality and preparedness helped close the deal.",
+      "scope": "historical-winning-workflow",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 44,
+        "lineEnd": 44
+      }
+    },
+    {
+      "id": "later-cli-run-unobserved",
+      "statement": "A later Agency OS CLI test for Khatuna was submitted with Iraqi Arabic notes, but its two in-flight results were not observed and may have been lost with the in-memory server.",
+      "scope": "later-unobserved-test",
+      "source": {
+        "kind": "repository-document",
+        "document": "HANDOFF.md",
+        "lineStart": 34,
+        "lineEnd": 39
+      }
+    }
+  ],
+  "materials": {
+    "exactInput": {
+      "status": "missing",
+      "reason": "The exact input used by the historical winning workflow is not present. The later unobserved CLI test is not the winning input."
+    },
+    "exactPrompt": {
+      "status": "missing",
+      "reason": "The exact historical winning prompt is not present."
+    },
+    "logoAssets": {
+      "status": "missing",
+      "reason": "The guide confirms that a logo was used, but the original logo file is not present."
+    },
+    "sourceEvidence": {
+      "status": "missing",
+      "reason": "The original prospect information supplied with the winning prompt is not present."
+    },
+    "outputScreenshots": {
+      "status": "missing",
+      "reason": "The historical Fable 5 output screenshots are not present."
+    },
+    "operatorEdits": {
+      "status": "missing",
+      "reason": "No exact record states what the operator changed, including whether the operator made no changes."
+    },
+    "clientResponse": {
+      "status": "documented",
+      "summary": "The guide states that the client requested no design edits; the original response or meeting record is not supplied.",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 42,
+        "lineEnd": 44
+      }
+    },
+    "meetingOutcome": {
+      "status": "documented",
+      "summary": "The guide states that quality and preparedness helped close the deal; the original outcome record is not supplied.",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 42,
+        "lineEnd": 44
+      }
+    }
+  }
+}

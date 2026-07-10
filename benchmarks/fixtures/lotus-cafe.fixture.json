@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "id": "lotus-cafe",
+  "displayName": "Lotus Cafe",
+  "role": "acceptance-case",
+  "handling": "protected",
+  "knownFacts": [
+    {
+      "id": "documented-starting-brief",
+      "statement": "The documented acceptance brief is: Business: Lotus Cafe; Evidence: Instagram page or screenshots; Asset: Lotus Cafe logo; Context: The cafe is near a college.",
+      "scope": "acceptance-case",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 85,
+        "lineEnd": 94
+      }
+    },
+    {
+      "id": "audience-is-hypothesis",
+      "statement": "Students and college staff are a likely audience hypothesis, not a confirmed fact unless evidence supports it.",
+      "scope": "acceptance-case",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 96,
+        "lineEnd": 101
+      }
+    },
+    {
+      "id": "unsupported-facts-forbidden",
+      "statement": "Exact prices, opening hours, delivery, discounts, address, menu items, and customer claims must not be invented when absent from evidence.",
+      "scope": "acceptance-case",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 112,
+        "lineEnd": 113
+      }
+    },
+    {
+      "id": "rendered-artifact-required",
+      "statement": "The acceptance test passes only when a final rendered mockup is saved, independently evaluated, and usable in a meeting.",
+      "scope": "acceptance-case",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 115,
+        "lineEnd": 117
+      }
+    }
+  ],
+  "materials": {
+    "exactInput": {
+      "status": "documented",
+      "summary": "The guide contains the four-line starting brief, but no protected fixture file has yet been supplied.",
+      "source": {
+        "kind": "repository-document",
+        "document": "PROJECT_COMPLETION_GUIDE.md",
+        "lineStart": 85,
+        "lineEnd": 94
+      }
+    },
+    "exactPrompt": {
+      "status": "missing",
+      "reason": "No Lotus Cafe benchmark prompt has been supplied or generated."
+    },
+    "logoAssets": {
+      "status": "missing",
+      "reason": "The acceptance brief names a Lotus Cafe logo, but the logo file is not present."
+    },
+    "sourceEvidence": {
+      "status": "missing",
+      "reason": "No exact Instagram URL, screenshots, menu, posts, or other Lotus Cafe evidence files are present."
+    },
+    "outputScreenshots": {
+      "status": "missing",
+      "reason": "No rendered Lotus Cafe desktop or mobile artifacts are present."
+    },
+    "operatorEdits": {
+      "status": "missing",
+      "reason": "No Lotus Cafe operator-edit record exists."
+    },
+    "clientResponse": {
+      "status": "missing",
+      "reason": "No Lotus Cafe client response is documented."
+    },
+    "meetingOutcome": {
+      "status": "missing",
+      "reason": "No Lotus Cafe meeting outcome is documented."
+    }
+  }
+}
