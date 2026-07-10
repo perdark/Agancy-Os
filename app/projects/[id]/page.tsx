@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import {
   PRICE_LEVEL_LABELS,
   type DiscoveryOutput,
+  type PrototypeOutput,
   type StageResult,
 } from "@/domain";
 import { getProject } from "@/features/projects/service";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
 import { GenesisOutputView } from "@/features/genesis/components/genesis-output-view";
+import { PrototypeOutputView } from "@/features/genesis/components/prototype-output-view";
 import {
   Card,
   CardContent,
@@ -29,6 +31,10 @@ export default async function ProjectDetailPage({
   // Genesis runs the Discovery stage.
   const genesis = project.workflow.results.discovery as
     | StageResult<DiscoveryOutput>
+    | undefined;
+
+  const prototype = project.workflow.results.prototype as
+    | StageResult<PrototypeOutput>
     | undefined;
 
   return (
@@ -81,6 +87,16 @@ export default async function ProjectDetailPage({
           </h2>
           <StageContractView result={genesis} />
           <GenesisOutputView output={genesis.output} />
+        </section>
+      ) : null}
+
+      {prototype ? (
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Prototype — first-meeting kit
+          </h2>
+          <StageContractView result={prototype} />
+          <PrototypeOutputView output={prototype.output} />
         </section>
       ) : null}
     </div>
