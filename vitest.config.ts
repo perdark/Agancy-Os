@@ -19,6 +19,10 @@ export default defineConfig({
     ],
   },
   test: {
-    include: ["packages/**/*.test.ts", "prompts/**/*.test.ts"],
+    include: [
+      "packages/**/*.test.ts",
+      "prompts/**/*.test.ts",
+      "lib/**/*.test.ts",
+    ],
   },
 });
