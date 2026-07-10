@@ -23,6 +23,8 @@ import {
 } from "./ai/cli-runtime-policy";
 import { cryptoIdGenerator } from "./adapters/id-generator";
 import { InMemoryProjectRepository } from "./adapters/in-memory-project-repository";
+import { DrizzleProjectRepository } from "./db/drizzle-project-repository";
+import { resolvePersistenceBackend } from "./db/persistence-policy";
 
 /**
  * Composition root.
@@ -38,6 +40,12 @@ import { InMemoryProjectRepository } from "./adapters/in-memory-project-reposito
  *   AGENCY_AI_BACKEND=placeholder → deterministic placeholders
  *   anything else / unset         → legacy auto: key present → api,
  *                                   else placeholder
+ *
+ * Persistence selection (see persistence-policy.ts):
+ *   AGENCY_PERSISTENCE=postgres|memory → explicit choice (postgres requires
+ *                                        DATABASE_URL)
+ *   unset                              → DATABASE_URL present → postgres,
+ *                                        else in-memory
  */
 export interface Container {
   readonly clock: Clock;
@@ -46,6 +54,8 @@ export interface Container {
   readonly discoveryGenerator: DiscoveryGenerator;
   readonly prototypeGenerator: PrototypeGenerator;
   readonly stages: StageRegistry;
+  /** Which AI transport the generators ride; recorded in run diagnostics. */
+  readonly aiBackend: AiBackend;
 }
 
 const buildGenerators = (
@@ -74,17 +84,22 @@ export const getContainer = (): Container => {
     clock: systemClock,
   };
 
-  const [discoveryGenerator, prototypeGenerator] = buildGenerators(
-    resolveAiBackend(),
-  );
+  const aiBackend = resolveAiBackend();
+  const [discoveryGenerator, prototypeGenerator] = buildGenerators(aiBackend);
+
+  const projects: ProjectRepository =
+    resolvePersistenceBackend() === "postgres"
+      ? new DrizzleProjectRepository()
+      : new InMemoryProjectRepository();
 
   container = {
     clock: systemClock,
     context,
-    projects: new InMemoryProjectRepository(),
+    projects,
     discoveryGenerator,
     prototypeGenerator,
     stages: buildStageRegistry(),
+    aiBackend,
   };
 
   return container;

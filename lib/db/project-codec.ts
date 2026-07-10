@@ -1,0 +1,246 @@
+import { z } from "zod";
+import {
+  asAssetId,
+  asDocumentId,
+  asHistoryEventId,
+  asProjectId,
+  PRICE_LEVELS,
+  readinessScore,
+  STAGE_KINDS,
+  type Project,
+  type Workflow,
+} from "@/domain";
+import type { NewProjectRow, ProjectRow } from "./schema";
+
+/**
+ * Project row codec — the runtime boundary between JSONB and the domain.
+ *
+ * Postgres serialises JSONB with JSON.stringify, so every Date inside the
+ * aggregate body comes back as an ISO string and nothing guarantees the stored
+ * shape still matches the domain. Decoding therefore validates structurally
+ * and revives Dates instead of blind-casting: a corrupted row fails loudly
+ * here, never as an `undefined is not a function` three screens later.
+ */
+const date = z.coerce.date();
+const stageKind = z.enum(STAGE_KINDS);
+const severity = z.enum(["low", "medium", "high"]);
+
+const evidenceSource = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("user-input"), field: z.string() }),
+  z.object({ kind: z.literal("asset"), assetId: z.string() }),
+  z.object({ kind: z.literal("prior-stage"), stage: stageKind }),
+  z.object({ kind: z.literal("external"), reference: z.string() }),
+  z.object({ kind: z.literal("assumption") }),
+]);
+
+const stageResult = z.object({
+  stage: stageKind,
+  // Stage-specific work product; opaque at rest, owned by the stage's codec.
+  output: z.unknown(),
+  readiness: z.number().transform(readinessScore),
+  qualityGate: z.enum(["pass", "warning", "fail"]),
+  evidence: z.array(
+    z.object({
+      id: z.string(),
+      summary: z.string(),
+      source: evidenceSource,
+      strength: z.number(),
+    }),
+  ),
+  doubts: z.array(
+    z.object({
+      id: z.string(),
+      concern: z.string(),
+      severity,
+      clarifyingQuestion: z.string().optional(),
+    }),
+  ),
+  missingInformation: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      whyItMatters: z.string(),
+      impact: severity,
+    }),
+  ),
+  recommendations: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      detail: z.string(),
+      priority: z.enum(["now", "soon", "later"]),
+    }),
+  ),
+  nextStep: z.object({
+    headline: z.string(),
+    detail: z.string(),
+    targetStage: stageKind.optional(),
+  }),
+  producedAt: date,
+});
+
+const stageRun = z.object({
+  stage: stageKind,
+  status: z.enum(["queued", "running", "failed", "complete"]),
+  attempts: z.number().int().nonnegative(),
+  queuedAt: date,
+  startedAt: date.optional(),
+  finishedAt: date.optional(),
+  durationMs: z.number().optional(),
+  diagnostics: z
+    .object({
+      backend: z.string(),
+      model: z.string().optional(),
+      promptId: z.string().optional(),
+      promptVersion: z.string().optional(),
+      promptHash: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
+});
+
+const historyEvent = z.discriminatedUnion("type", [
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("project.created"),
+    businessName: z.string(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("stage.run"),
+    stage: stageKind,
+    readiness: z.number(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("stage.advanced"),
+    from: stageKind,
+    to: stageKind,
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("document.added"),
+    documentId: z.string(),
+    title: z.string(),
+    at: date,
+  }),
+]);
+
+const asset = z.object({
+  id: z.string().transform(asAssetId),
+  label: z.string(),
+  kind: z.enum(["logo", "image", "document", "reference", "other"]),
+  uri: z.string(),
+  mimeType: z.string().optional(),
+  addedAt: date,
+});
+
+const document = z.object({
+  id: z.string().transform(asDocumentId),
+  title: z.string(),
+  kind: z.enum([
+    "brief",
+    "positioning",
+    "brand-assumptions",
+    "prototype-direction",
+    "design-prompt",
+    "note",
+  ]),
+  body: z.string(),
+  originStage: stageKind.optional(),
+  createdAt: date,
+  updatedAt: date,
+});
+
+const knowledge = z.object({
+  entries: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.enum(["fact", "decision", "insight", "reference", "constraint"]),
+      title: z.string(),
+      content: z.string(),
+      originStage: z.string().optional(),
+      recordedAt: date,
+    }),
+  ),
+});
+
+const discovery = z.object({
+  openQuestions: z.array(z.string()),
+  hypotheses: z.array(z.string()),
+  constraints: z.array(z.string()),
+});
+
+/** Rows written before run-tracking existed have no runs; default them. */
+const workflowRuns = z
+  .record(stageKind, stageRun)
+  .nullish()
+  .transform((value) => value ?? {});
+
+/** The aggregate identity lives in real columns; validate the enums on read. */
+const identityColumns = z.object({
+  priceLevel: z.enum(PRICE_LEVELS),
+  currentStage: stageKind,
+});
+
+/** Serialise the aggregate for storage. Drizzle JSON-stringifies JSONB values. */
+export const toProjectRow = (project: Project): NewProjectRow => ({
+  id: project.id,
+  businessName: project.identity.businessName,
+  businessType: project.identity.businessType,
+  market: project.identity.market,
+  country: project.identity.country,
+  audience: project.identity.audience,
+  priceLevel: project.identity.priceLevel,
+  notes: project.identity.notes,
+  currentStage: project.workflow.currentStage,
+  discovery: project.discovery,
+  knowledge: project.knowledge,
+  workflowResults: project.workflow.results,
+  workflowRuns: project.workflow.runs,
+  documents: project.documents,
+  assets: project.assets,
+  history: project.history,
+  createdAt: project.createdAt,
+  updatedAt: project.updatedAt,
+});
+
+/** Decode a stored row back into the aggregate, validating as it revives. */
+export const toProject = (row: ProjectRow): Project => {
+  const columns = identityColumns.parse({
+    priceLevel: row.priceLevel,
+    currentStage: row.currentStage,
+  });
+
+  const workflow: Workflow = {
+    currentStage: columns.currentStage,
+    results: z
+      .record(stageKind, stageResult)
+      .parse(row.workflowResults) as Workflow["results"],
+    runs: workflowRuns.parse(row.workflowRuns),
+  };
+
+  return {
+    id: asProjectId(row.id),
+    identity: {
+      businessName: row.businessName,
+      businessType: row.businessType,
+      market: row.market,
+      country: row.country,
+      audience: row.audience,
+      priceLevel: columns.priceLevel,
+      notes: row.notes,
+    },
+    discovery: discovery.parse(row.discovery),
+    knowledge: knowledge.parse(row.knowledge),
+    workflow,
+    documents: document.array().parse(row.documents),
+    assets: asset.array().parse(row.assets),
+    history: historyEvent.array().parse(row.history),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+};

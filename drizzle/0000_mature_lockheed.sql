@@ -1,0 +1,20 @@
+CREATE TABLE "projects" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"business_name" text NOT NULL,
+	"business_type" text NOT NULL,
+	"market" text NOT NULL,
+	"country" text NOT NULL,
+	"audience" text NOT NULL,
+	"price_level" text NOT NULL,
+	"notes" text DEFAULT '' NOT NULL,
+	"current_stage" text DEFAULT 'discovery' NOT NULL,
+	"discovery" jsonb NOT NULL,
+	"knowledge" jsonb NOT NULL,
+	"workflow_results" jsonb NOT NULL,
+	"workflow_runs" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"documents" jsonb NOT NULL,
+	"assets" jsonb NOT NULL,
+	"history" jsonb NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL
+);

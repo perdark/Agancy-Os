@@ -1,50 +1,59 @@
 import { eq } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import {
   asProjectId,
   STAGE_LABELS,
-  type Asset,
-  type Discovery,
-  type Document,
-  type HistoryEvent,
-  type Knowledge,
-  type PriceLevel,
   type Project,
   type ProjectId,
   type ProjectRepository,
   type ProjectSummary,
   type StageKind,
-  type Workflow,
 } from "@/domain";
 import { getDb } from "./client";
-import { projects, type NewProjectRow, type ProjectRow } from "./schema";
+import { projects } from "./schema";
+import type * as schema from "./schema";
+import { toProject, toProjectRow } from "./project-codec";
+
+/**
+ * Accepts any Drizzle Postgres database over our schema — postgres-js in
+ * production, PGlite in tests — so round-trips are testable without a server.
+ */
+export type ProjectDatabase = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /**
  * The real persistence adapter: implements the {@link ProjectRepository} port
  * against Postgres via Drizzle. It is the *only* place that knows about rows
- * and columns. Mapping between the aggregate and the row is confined to the two
- * functions below, so the domain never sees a database shape.
+ * and columns; mapping and runtime validation live in the codec
+ * (see project-codec.ts), so the domain never sees a database shape and a
+ * corrupted row fails loudly on read.
  */
 export class DrizzleProjectRepository implements ProjectRepository {
+  constructor(private readonly db?: ProjectDatabase) {}
+
+  private database(): ProjectDatabase {
+    return this.db ?? getDb();
+  }
+
   async save(project: Project): Promise<void> {
-    const row = toRow(project);
-    await getDb()
+    const row = toProjectRow(project);
+    await this.database()
       .insert(projects)
       .values(row)
       .onConflictDoUpdate({ target: projects.id, set: row });
   }
 
   async findById(id: ProjectId): Promise<Project | null> {
-    const rows = await getDb()
+    const rows = await this.database()
       .select()
       .from(projects)
       .where(eq(projects.id, id))
       .limit(1);
     const row = rows[0];
-    return row ? toDomain(row) : null;
+    return row ? toProject(row) : null;
   }
 
   async list(): Promise<ProjectSummary[]> {
-    const rows = await getDb().select().from(projects);
+    const rows = await this.database().select().from(projects);
     return rows
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .map((row) => ({
@@ -55,51 +64,3 @@ export class DrizzleProjectRepository implements ProjectRepository {
       }));
   }
 }
-
-const toRow = (project: Project): NewProjectRow => ({
-  id: project.id,
-  businessName: project.identity.businessName,
-  businessType: project.identity.businessType,
-  market: project.identity.market,
-  country: project.identity.country,
-  audience: project.identity.audience,
-  priceLevel: project.identity.priceLevel,
-  notes: project.identity.notes,
-  currentStage: project.workflow.currentStage,
-  discovery: project.discovery,
-  knowledge: project.knowledge,
-  workflowResults: project.workflow.results,
-  documents: project.documents,
-  assets: project.assets,
-  history: project.history,
-  createdAt: project.createdAt,
-  updatedAt: project.updatedAt,
-});
-
-const toDomain = (row: ProjectRow): Project => {
-  const workflow: Workflow = {
-    currentStage: row.currentStage as StageKind,
-    results: row.workflowResults as Workflow["results"],
-  };
-
-  return {
-    id: asProjectId(row.id),
-    identity: {
-      businessName: row.businessName,
-      businessType: row.businessType,
-      market: row.market,
-      country: row.country,
-      audience: row.audience,
-      priceLevel: row.priceLevel as PriceLevel,
-      notes: row.notes,
-    },
-    discovery: row.discovery as Discovery,
-    knowledge: row.knowledge as Knowledge,
-    workflow,
-    documents: row.documents as Document[],
-    assets: row.assets as Asset[],
-    history: row.history as HistoryEvent[],
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-};
