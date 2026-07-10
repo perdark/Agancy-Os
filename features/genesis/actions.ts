@@ -29,11 +29,12 @@ export const createProjectFromGenesis = async (
     revalidatePath("/projects");
     return { ok: true, projectId: project.id };
   } catch (error) {
-    // A failed decode is honest and visible; no project is persisted.
+    console.error("Genesis failed:", error);
+    // A failed generation is honest and visible; no project is persisted.
     const message =
       error instanceof Error
         ? error.message
-        : "Discovery failed. Please try again.";
+        : "Genesis failed. Please try again.";
     return { ok: false, error: message };
   }
 };
