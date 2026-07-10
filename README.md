@@ -21,10 +21,20 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Version 1 runs with **no database** — it defaults to
-an in-memory repository. To enable Postgres persistence, copy `.env.example` to
-`.env`, set `DATABASE_URL`, and bind `DrizzleProjectRepository` in
-`lib/container.ts`.
+Open http://localhost:3000. With no configuration the app runs on an
+in-memory repository (non-durable — a restart loses projects). To enable
+durable Postgres persistence, copy `.env.example` to `.env.local`, set
+`DATABASE_URL`, and run `npm run db:migrate` once; the container binds the
+Drizzle repository automatically whenever `DATABASE_URL` is present
+(`AGENCY_PERSISTENCE=postgres|memory` overrides explicitly). Stored rows are
+validated and Date-revived on read by a runtime codec — a corrupted row fails
+loudly instead of leaking strings where Dates belong.
+
+Generation is draft-first and resumable: the project draft is saved before any
+AI call, every stage run persists its `queued / running / failed / complete`
+state with diagnostics (backend, model, prompt version + hash, duration,
+error), and a failed Prototype retries from the saved Discovery result instead
+of re-running both stages.
 
 ### AI backend
 

@@ -195,16 +195,38 @@ public-error, CLI-isolation, and runtime-policy tests plus TypeScript and lint.
   one-shot structured generation.
 - [x] Add an explicit guard that prevents the CLI backend from serving an unsafe
   deployed or multi-user environment.
+- [x] Pin the CLI one-shot to an explicit fast model and effort
+  (`claude-sonnet-5`, `medium`; `AGENCY_CLI_MODEL`/`AGENCY_CLI_EFFORT`/
+  `AGENCY_CLI_TIMEOUT_MS` override) so generation never silently inherits the
+  operator's interactive deep-reasoning defaults. Found 2026-07-10 when live
+  verification showed the operator's `opus[1m]` + xhigh defaults made the app
+  look frozen; verified with a full browser run (Discovery 71s, Prototype 87s,
+  both complete with recorded model and prompt hash).
 
 ### Step 2: Persist the work before generation
 
-- Bind durable persistence through configuration.
-- Save a prospect/project draft immediately after intake.
-- Persist each stage independently with `queued`, `running`, `failed`, and
+**Status: DONE — 2026-07-10.** Verified with 126 passing tests (domain
+stage-run transitions, PGlite database round-trips with Date revival,
+resumable-runner behaviour with fakes, action-level tests), TypeScript, lint,
+production build, and a full browser run on the real CLI backend: the draft
+was listed mid-generation, stage states progressed
+queued→running→complete independently, and diagnostics recorded
+`cli · claude-sonnet-5 · <prompt>@0.1.0` with durations. The restart-survival
+check on a real Postgres instance still needs a provisioned `DATABASE_URL`
+(no local server exists); the serialization layer is proven against PGlite's
+real Postgres engine.
+
+- [x] Bind durable persistence through configuration
+  (`AGENCY_PERSISTENCE`/`DATABASE_URL`; misconfiguration fails at composition).
+- [x] Save a prospect/project draft immediately after intake.
+- [x] Persist each stage independently with `queued`, `running`, `failed`, and
   `complete` states.
-- Retry Prototype from saved Discovery instead of repeating both calls.
-- Record backend, actual model, prompt version/hash, duration, and errors.
-- Add database round-trip tests with runtime decoding and Date revival.
+- [x] Retry Prototype from saved Discovery instead of repeating both calls
+  (resume also recovers stale interrupted runs; fresh in-flight runs are never
+  offered a racing resume).
+- [x] Record backend, actual model, prompt version/hash, duration, and errors.
+- [x] Add database round-trip tests with runtime decoding and Date revival
+  (in-process PGlite Postgres through the generated Drizzle migrations).
 
 ### Step 3: Build the minimal evidence intake
 
@@ -365,9 +387,11 @@ The agent must then:
 
 Execute these in order:
 
-1. Fix and test the complete clipboard package.
+1. ~~Fix and test the complete clipboard package.~~ **Done 2026-07-10.**
 2. Create the Khatuna and Lotus benchmark fixtures and scoring rubric.
-3. Add durable draft/run persistence with resumable stage execution.
+   *Framework done; blocked on the owner supplying the original materials.*
+3. ~~Add durable draft/run persistence with resumable stage execution.~~
+   **Done 2026-07-10.**
 4. Implement real logo and evidence upload with previews and source metadata.
 5. Add artifact import and make the mockup the first content on the project
    screen.
