@@ -1,4 +1,7 @@
-import type { PrototypeOutput } from "@/domain";
+import {
+  buildClaudeDesignPackage,
+  type PrototypeOutput,
+} from "@/domain";
 import {
   Card,
   CardContent,
@@ -16,6 +19,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 export function PrototypeOutputView({ output }: { output: PrototypeOutput }) {
   const { brandAssumptions, positioning, prototypeDirection, designPrompt } =
     output;
+  const completePackage = buildClaudeDesignPackage(designPrompt);
 
   return (
     <div className="grid gap-4">
@@ -64,16 +68,17 @@ export function PrototypeOutputView({ output }: { output: PrototypeOutput }) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base">Claude Design prompt</CardTitle>
-            <CopyButton text={designPrompt.prompt} label="Copy prompt" />
+            <CardTitle className="text-base">Claude Design package</CardTitle>
+            <CopyButton
+              text={completePackage}
+              label="Copy complete package"
+            />
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs leading-relaxed">
-            {designPrompt.prompt}
+            {completePackage}
           </pre>
-          <List label="Constraints" items={designPrompt.constraints} />
-          <List label="References" items={designPrompt.references} />
         </CardContent>
       </Card>
     </div>

@@ -2,6 +2,46 @@ import { z } from "zod";
 import { PRICE_LEVELS, type GenesisInput } from "@/domain";
 
 /**
+ * Intake limits live beside the edge schema so every caller applies the same
+ * resource bounds before data reaches the domain or a generator.
+ */
+export const GENESIS_INPUT_LIMITS = {
+  businessName: 120,
+  businessType: 120,
+  market: 120,
+  country: 120,
+  audience: 280,
+  notes: 2_000,
+  assets: 12,
+  assetLabel: 120,
+  assetUri: 2_048,
+  assetMimeType: 128,
+  assetFileName: 255,
+  assetFileBytes: 10 * 1024 * 1024,
+  totalAssetFileBytes: 50 * 1024 * 1024,
+} as const;
+
+const normalizeText = (value: string): string =>
+  value.trim().normalize("NFC");
+
+const requiredText = (label: string, max: number) =>
+  z
+    .string()
+    .transform(normalizeText)
+    .pipe(
+      z
+        .string()
+        .min(1, `${label} is required`)
+        .max(max, `${label} must be ${max} characters or fewer`),
+    );
+
+const boundedText = (label: string, max: number) =>
+  z
+    .string()
+    .transform(normalizeText)
+    .pipe(z.string().max(max, `${label} must be ${max} characters or fewer`));
+
+/**
  * Edge validation for Project Genesis.
  *
  * Zod guards the *shape* of untrusted input at the boundary (form + server
@@ -10,20 +50,81 @@ import { PRICE_LEVELS, type GenesisInput } from "@/domain";
  * domain is a compile error, not a runtime surprise.
  */
 export const genesisAssetSchema = z.object({
-  label: z.string().min(1, "Label is required"),
-  uri: z.string().url("Must be a valid URL"),
-  mimeType: z.string().optional(),
+  label: requiredText("Asset label", GENESIS_INPUT_LIMITS.assetLabel),
+  uri: requiredText("Asset URL", GENESIS_INPUT_LIMITS.assetUri).pipe(
+    z
+      .string()
+      .url("Asset URL must be a valid URL")
+      .refine(
+        (value) => /^https?:\/\//i.test(value),
+        "Asset URL must use HTTP or HTTPS",
+      ),
+  ),
+  mimeType: boundedText(
+    "Asset MIME type",
+    GENESIS_INPUT_LIMITS.assetMimeType,
+  )
+    .optional()
+    .transform((value) => value || undefined),
 });
 
+/**
+ * Metadata boundary for uploads. File bytes stay outside Zod; server actions
+ * map each received File to this shape before any storage adapter is called.
+ */
+export const genesisUploadMetadataSchema = z.object({
+  name: requiredText("File name", GENESIS_INPUT_LIMITS.assetFileName),
+  mimeType: requiredText(
+    "File MIME type",
+    GENESIS_INPUT_LIMITS.assetMimeType,
+  ),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive("Uploaded files cannot be empty")
+    .max(
+      GENESIS_INPUT_LIMITS.assetFileBytes,
+      `Each file must be ${GENESIS_INPUT_LIMITS.assetFileBytes} bytes or smaller`,
+    ),
+});
+
+export const genesisUploadBatchSchema = z
+  .array(genesisUploadMetadataSchema)
+  .max(
+    GENESIS_INPUT_LIMITS.assets,
+    `No more than ${GENESIS_INPUT_LIMITS.assets} files may be attached`,
+  )
+  .superRefine((files, context) => {
+    const totalBytes = files.reduce((total, file) => total + file.sizeBytes, 0);
+    if (totalBytes > GENESIS_INPUT_LIMITS.totalAssetFileBytes) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Uploaded files must total ${GENESIS_INPUT_LIMITS.totalAssetFileBytes} bytes or less`,
+      });
+    }
+  });
+
 export const genesisInputSchema = z.object({
-  businessName: z.string().min(1, "Business name is required").max(120),
-  businessType: z.string().min(1, "Business type is required").max(120),
-  market: z.string().min(1, "Market is required").max(120),
-  country: z.string().min(1, "Country is required").max(120),
-  audience: z.string().min(1, "Audience is required").max(280),
+  businessName: requiredText(
+    "Business name",
+    GENESIS_INPUT_LIMITS.businessName,
+  ),
+  businessType: requiredText(
+    "Business type",
+    GENESIS_INPUT_LIMITS.businessType,
+  ),
+  market: requiredText("Market", GENESIS_INPUT_LIMITS.market),
+  country: requiredText("Country", GENESIS_INPUT_LIMITS.country),
+  audience: requiredText("Audience", GENESIS_INPUT_LIMITS.audience),
   priceLevel: z.enum(PRICE_LEVELS),
-  notes: z.string().max(2000).default(""),
-  assets: z.array(genesisAssetSchema).default([]),
+  notes: boundedText("Notes", GENESIS_INPUT_LIMITS.notes).default(""),
+  assets: z
+    .array(genesisAssetSchema)
+    .max(
+      GENESIS_INPUT_LIMITS.assets,
+      `No more than ${GENESIS_INPUT_LIMITS.assets} assets may be attached`,
+    )
+    .default([]),
 });
 
 export type GenesisFormValues = z.input<typeof genesisInputSchema>;

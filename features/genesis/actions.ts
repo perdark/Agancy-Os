@@ -1,6 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  GENESIS_PUBLIC_ERROR_MESSAGES,
+  toGenesisPublicErrorMessage,
+} from "./errors";
 import { genesisInputSchema, type GenesisFormValues } from "./schema";
 import { runGenesis } from "./service";
 
@@ -21,7 +25,7 @@ export const createProjectFromGenesis = async (
 ): Promise<GenesisActionResult> => {
   const parsed = genesisInputSchema.safeParse(values);
   if (!parsed.success) {
-    return { ok: false, error: "The brief is incomplete or invalid." };
+    return { ok: false, error: GENESIS_PUBLIC_ERROR_MESSAGES.invalidInput };
   }
 
   try {
@@ -30,11 +34,8 @@ export const createProjectFromGenesis = async (
     return { ok: true, projectId: project.id };
   } catch (error) {
     console.error("Genesis failed:", error);
-    // A failed generation is honest and visible; no project is persisted.
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Genesis failed. Please try again.";
-    return { ok: false, error: message };
+    // The server log keeps the cause; the client gets stable, provider-neutral
+    // copy that cannot leak credentials, file paths, or transport diagnostics.
+    return { ok: false, error: toGenesisPublicErrorMessage(error) };
   }
 };

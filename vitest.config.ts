@@ -23,6 +23,8 @@ export default defineConfig({
       "packages/**/*.test.ts",
       "prompts/**/*.test.ts",
       "lib/**/*.test.ts",
+      "features/**/*.test.ts",
+      "benchmarks/**/*.test.ts",
     ],
   },
 });
