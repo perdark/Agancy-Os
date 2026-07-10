@@ -23,7 +23,35 @@ interface ClaudeEnvelope {
   readonly subtype?: string;
   readonly result?: string;
   readonly structured_output?: unknown;
+  /** Per-model usage; the key with the most output tokens is the actual model. */
+  readonly modelUsage?: Record<
+    string,
+    { readonly outputTokens?: number } | undefined
+  >;
 }
+
+/**
+ * The model that authored the structured output. The envelope reports usage
+ * per model (a small helper model may also appear); the one that produced the
+ * most output tokens is the honest answer. Undefined when the envelope does
+ * not say — never guessed.
+ */
+const extractModel = (envelope: ClaudeEnvelope): string | undefined => {
+  const usage = envelope.modelUsage;
+  if (!usage || typeof usage !== "object") return undefined;
+
+  let best: string | undefined;
+  let bestTokens = -1;
+  for (const [model, stats] of Object.entries(usage)) {
+    const tokens =
+      typeof stats?.outputTokens === "number" ? stats.outputTokens : 0;
+    if (tokens > bestTokens) {
+      best = model;
+      bestTokens = tokens;
+    }
+  }
+  return best;
+};
 
 /**
  * Minimal environment needed to locate the CLI, read the operator's local
@@ -124,7 +152,41 @@ export interface RunClaudeStructuredOptions {
   readonly exec?: ClaudeExec;
 }
 
-const DEFAULT_TIMEOUT_MS = 180_000;
+/**
+ * One-shot generation must never inherit the operator's interactive session
+ * defaults: a deep-reasoning default model (e.g. Opus/Fable at xhigh effort)
+ * turns a ~60s structured decode into many minutes of silent "not
+ * responding". The same fast tier the API transport pins is pinned here,
+ * with explicit env overrides for operators who accept the latency.
+ */
+export const DEFAULT_CLI_MODEL = "claude-sonnet-5";
+export const DEFAULT_CLI_EFFORT = "medium";
+const DEFAULT_TIMEOUT_MS = 420_000;
+
+const resolveCliModel = (
+  environment: Readonly<Record<string, string | undefined>>,
+): string => environment.AGENCY_CLI_MODEL?.trim() || DEFAULT_CLI_MODEL;
+
+const resolveCliEffort = (
+  environment: Readonly<Record<string, string | undefined>>,
+): string => environment.AGENCY_CLI_EFFORT?.trim() || DEFAULT_CLI_EFFORT;
+
+const resolveCliTimeoutMs = (
+  environment: Readonly<Record<string, string | undefined>>,
+  fallback: number,
+): number => {
+  const raw = environment.AGENCY_CLI_TIMEOUT_MS?.trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+export interface ClaudeStructuredResult {
+  /** The envelope's `structured_output` — still unvalidated. */
+  readonly output: unknown;
+  /** The model that authored the output, when the envelope reports it. */
+  readonly model?: string;
+}
 
 /**
  * Runs `claude -p` with JSON output and an enforced `--json-schema`, and
@@ -139,9 +201,13 @@ export const runClaudeStructured = async ({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   environment = process.env,
   exec = realExec,
-}: RunClaudeStructuredOptions): Promise<unknown> => {
+}: RunClaudeStructuredOptions): Promise<ClaudeStructuredResult> => {
   const args = [
     "-p",
+    "--model",
+    resolveCliModel(environment),
+    "--effort",
+    resolveCliEffort(environment),
     "--safe-mode",
     "--disable-slash-commands",
     "--no-session-persistence",
@@ -160,7 +226,7 @@ export const runClaudeStructured = async ({
   let stdout: string;
   try {
     ({ stdout } = await exec(args, prompt, {
-      timeoutMs,
+      timeoutMs: resolveCliTimeoutMs(environment, timeoutMs),
       env: buildClaudeChildEnv(environment),
     }));
   } catch (cause) {
@@ -199,5 +265,5 @@ export const runClaudeStructured = async ({
     );
   }
 
-  return envelope.structured_output;
+  return { output: envelope.structured_output, model: extractModel(envelope) };
 };
