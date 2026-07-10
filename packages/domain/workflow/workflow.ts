@@ -1,4 +1,5 @@
 import type { StageResult } from "./stage-result";
+import type { StageRun } from "./stage-run";
 import { type StageKind, STAGE_ORDER } from "./stage-kind";
 
 /**
@@ -18,11 +19,15 @@ export interface Workflow {
 
   /** The latest full result recorded for each stage that has been run. */
   readonly results: Partial<Record<StageKind, StageResult>>;
+
+  /** The latest execution record for each stage (see {@link StageRun}). */
+  readonly runs: Partial<Record<StageKind, StageRun>>;
 }
 
 export const initialWorkflow = (): Workflow => ({
   currentStage: "discovery",
   results: {},
+  runs: {},
 });
 
 /**

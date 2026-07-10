@@ -40,4 +40,23 @@ export interface Stage<TInput = unknown, TOutput = unknown> {
 export interface StageContext {
   readonly ids: IdGenerator;
   readonly clock: Clock;
+
+  /**
+   * Optional observability sink. Generators report what actually produced a
+   * result (model, versioned prompt) so the caller can persist honest run
+   * diagnostics. Absence means nobody is listening — never a failure.
+   */
+  readonly probe?: GenerationProbe;
+}
+
+/** One observed fact about a generation attempt. Entries merge left-to-right. */
+export interface GenerationProbeEntry {
+  readonly model?: string;
+  readonly promptId?: string;
+  readonly promptVersion?: string;
+  readonly promptHash?: string;
+}
+
+export interface GenerationProbe {
+  report(entry: GenerationProbeEntry): void;
 }

@@ -4,5 +4,6 @@ export * from "./quality-gate";
 export * from "./stage-result";
 export * from "./stage-result.factory";
 export * from "./stage";
+export * from "./stage-run";
 export * from "./registry";
 export * from "./workflow";
