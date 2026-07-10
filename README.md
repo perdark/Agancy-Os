@@ -26,6 +26,19 @@ an in-memory repository. To enable Postgres persistence, copy `.env.example` to
 `.env`, set `DATABASE_URL`, and bind `DrizzleProjectRepository` in
 `lib/container.ts`.
 
+### AI backend
+
+Discovery + Prototype generation runs on one of three backends, selected by
+`AGENCY_AI_BACKEND` in `.env.local`:
+
+- `cli` — the local `claude` CLI (Claude Code) in headless mode, riding your
+  Claude subscription and your default model. **Single-operator local use
+  only** — a deployed or multi-user instance must use the API backend.
+- `api` — the Anthropic API (`ANTHROPIC_API_KEY`).
+- `placeholder` — deterministic placeholders; the app runs with zero setup.
+
+Unset, it auto-selects: `api` when a key is present, else `placeholder`.
+
 ## What's here
 
 - **Project Genesis** (`/projects/new`) — capture a brief; it runs the

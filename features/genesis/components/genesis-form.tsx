@@ -141,8 +141,8 @@ export function GenesisForm() {
           {isPending ? "Building first-meeting kit…" : "Create project"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Decodes the brief, then builds the first-meeting kit (two AI steps,
-          ≈30–60s).
+          Decodes the brief, then builds the first-meeting kit (two AI steps —
+          can take a couple of minutes).
         </p>
       </div>
     </form>

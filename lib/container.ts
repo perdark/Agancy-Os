@@ -15,6 +15,8 @@ import {
 } from "@/stages";
 import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
+import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
+import { CliPrototypeGenerator } from "./ai/cli-prototype-generator";
 import { cryptoIdGenerator } from "./adapters/id-generator";
 import { InMemoryProjectRepository } from "./adapters/in-memory-project-repository";
 
@@ -22,15 +24,16 @@ import { InMemoryProjectRepository } from "./adapters/in-memory-project-reposito
  * Composition root.
  *
  * The single place where domain ports are bound to concrete Version 1
- * adapters. Every swap the architecture anticipates — real persistence, a real
- * AI generator — happens here and nowhere else. Feature code asks the container
- * for a capability by its port type; it never news up an adapter itself.
+ * adapters. Every swap the architecture anticipates — real persistence, a
+ * different AI transport — happens here and nowhere else.
  *
- * Version 1 bindings, all deliberately minimal:
- *   ProjectRepository  → in-memory (no database required to run)
- *   DiscoveryGenerator → Claude when ANTHROPIC_API_KEY is set, else placeholder
- *   PrototypeGenerator → Claude when ANTHROPIC_API_KEY is set, else placeholder
- *   StageRegistry      → seven placeholder stages
+ * AI backend selection (both generators always come from the same backend):
+ *   AGENCY_AI_BACKEND=cli         → local claude CLI (subscription auth;
+ *                                   single-operator local use only)
+ *   AGENCY_AI_BACKEND=api         → Anthropic API (ANTHROPIC_API_KEY)
+ *   AGENCY_AI_BACKEND=placeholder → deterministic placeholders
+ *   anything else / unset         → legacy auto: key present → api,
+ *                                   else placeholder
  */
 export interface Container {
   readonly clock: Clock;
@@ -40,6 +43,32 @@ export interface Container {
   readonly prototypeGenerator: PrototypeGenerator;
   readonly stages: StageRegistry;
 }
+
+type AiBackend = "cli" | "api" | "placeholder";
+
+const resolveBackend = (): AiBackend => {
+  const explicit = process.env.AGENCY_AI_BACKEND;
+  if (explicit === "cli" || explicit === "api" || explicit === "placeholder") {
+    return explicit;
+  }
+  return process.env.ANTHROPIC_API_KEY ? "api" : "placeholder";
+};
+
+const buildGenerators = (
+  backend: AiBackend,
+): readonly [DiscoveryGenerator, PrototypeGenerator] => {
+  switch (backend) {
+    case "cli":
+      return [new CliDiscoveryGenerator(), new CliPrototypeGenerator()];
+    case "api":
+      return [new ClaudeDiscoveryGenerator(), new ClaudePrototypeGenerator()];
+    case "placeholder":
+      return [
+        new PlaceholderDiscoveryGenerator(),
+        new PlaceholderPrototypeGenerator(),
+      ];
+  }
+};
 
 let container: Container | null = null;
 
@@ -51,20 +80,16 @@ export const getContainer = (): Container => {
     clock: systemClock,
   };
 
-  // The one place the AI seam is bound: real generators when a key is present,
-  // deterministic placeholders when it is not (so the app always runs).
-  const hasAiKey = Boolean(process.env.ANTHROPIC_API_KEY);
+  const [discoveryGenerator, prototypeGenerator] = buildGenerators(
+    resolveBackend(),
+  );
 
   container = {
     clock: systemClock,
     context,
     projects: new InMemoryProjectRepository(),
-    discoveryGenerator: hasAiKey
-      ? new ClaudeDiscoveryGenerator()
-      : new PlaceholderDiscoveryGenerator(),
-    prototypeGenerator: hasAiKey
-      ? new ClaudePrototypeGenerator()
-      : new PlaceholderPrototypeGenerator(),
+    discoveryGenerator,
+    prototypeGenerator,
     stages: buildStageRegistry(),
   };
 
