@@ -1,100 +1,146 @@
-# HANDOFF — Agency OS session state (2026-07-10)
+# HANDOFF — completion-guide work stopped for Claude
 
-Everything from today's session: what shipped, what's verified, what's mid-flight,
-and exactly how to resume. Written at the moment the live CLI test was submitted
-but not yet observed.
+**Date:** 2026-07-10
 
-## What shipped today (all committed on `claude/agency-os-foundation-gr9yso`)
+**Branch:** `claude/agency-os-foundation-gr9yso`
+**Reason for handoff:** The owner asked Codex to stop before hitting the usage
+limit and continue with Claude/Fable 5.
 
-### 1. Prototype stage — "first-meeting kit" (V1.6) — DONE, merge-ready
-- Commits `5d02715..541558a` (7). Final whole-branch review verdict: **ready to merge**.
-- One form submit runs Discovery → Prototype atomically. Output: brand
-  assumptions · positioning · prototype direction with `worldFacts` · paste-ready
-  Claude Design prompt (opens with the two mandated design-DNA sentences, carries
-  the 10-rule hard floor). Copy button with visible failure state + aria-live.
-- Spec: `docs/superpowers/specs/2026-07-10-prototype-stage-design.md`
-- Plan: `docs/superpowers/plans/2026-07-10-prototype-stage.md`
-- Verified: typecheck/lint/18 tests green + full placeholder-path browser
-  walkthrough (including instrumented clipboard proof).
+## Read first
 
-### 2. Claude Code CLI backend — BUILT, one verification step interrupted
-- Commits `423b864` (spec), `bc3767b` (plan), `053d43d` (codecs), `8525cb7`
-  (spawn helper), `b860e5f` (transports + container). All three task reviews
-  clean, zero Critical/Important.
-- `AGENCY_AI_BACKEND=cli|api|placeholder` in `.env.local` selects the backend;
-  unset = legacy auto (key → api, else placeholder). CLI mode spawns
-  `claude -p --output-format json --json-schema …` (probe-verified on this
-  machine, Claude Code 2.1.206), rides the Claude subscription and the user's
-  default model (Fable 5 today), strips `ANTHROPIC_API_KEY` from the child env.
-  **Single-operator local use only** (policy) — deployed/multi-user must use api.
-- Spec: `docs/superpowers/specs/2026-07-10-cli-backend-design.md`
-- Plan: `docs/superpowers/plans/2026-07-10-cli-backend.md`
-- Gates green: typecheck · lint · **26 tests (11 files)**. Placeholder path
-  re-verified in browser after the change.
+Before changing code, read in this order:
 
-## State at interruption (the live CLI test)
+1. `PROJECT_COMPLETION_GUIDE.md`
+2. `ARCHITECTURE.md`
+3. This handoff
+4. Relevant tests/specifications
 
-- `.env.local` contains `AGENCY_AI_BACKEND=cli` (created today; keep).
-- A dev server was running in the session background; a Khatuna test project was
-  submitted through the form (notes in real Iraqi Arabic:
-  «العميلة قالت: خليها فخمة وشيك، أريد شي يجنن — وما عجبها أي تصميم شافته قبل.
-  الزبائن يحجزون عن طريق انستةرام وواتساپ»). Two Fable-5 CLI calls were in
-  flight (~1.5–3 min expected) when the session was interrupted.
-- **The repository is in-memory** — results vanish when the dev server stops.
-  If the server is gone, just re-run the test (steps below). Nothing is lost
-  but one form submit.
+The guide is the product-priority authority. `ARCHITECTURE.md` remains the
+dependency-boundary authority. Do not mark a guide item done without its
+verification passing, and do not fabricate benchmark evidence.
 
-## How to run the live CLI test (5 minutes, do this first)
+## Exact stop point
 
-```bash
-cd ~/Desktop/agancy-os
-npm run dev
-# open http://localhost:3000/projects/new
-# fill: Khatuna / wedding planning / weddings / Iraq / engaged couples
-# notes: any real vague client words in Iraqi Arabic
-# submit, wait ~1.5–3 min (two Fable 5 calls on your subscription)
+- **Step 1 is implemented, verified, and marked DONE in the guide.**
+- **Step 0 is IN PROGRESS.** Its fixture schema, rubric, blind allocation, status
+  evaluation, pending Khatuna/Lotus manifests, and tests exist. It is not done
+  because the original evidence is absent.
+- **Steps 2–9 were not started.** The guide explicitly says not to begin them
+  until its five immediate tasks and the full Lotus acceptance test are done.
+- No commit was created. All work is an intentional dirty working tree.
+- `PROJECT_COMPLETION_GUIDE.md` itself remains untracked.
+
+## Historical Khatuna CLI note preserved for the fixture
+
+A later Agency OS Khatuna test—not the historical winning run—was submitted in
+the browser with realistic Iraqi Arabic notes. Two Fable 5 CLI calls were still
+in flight when that earlier session stopped. The repository was using the
+in-memory adapter, so the unobserved result may have disappeared when the dev
+server stopped. Do not treat this later test input or outcome as the exact
+Khatuna-winning benchmark fixture.
+
+## What changed
+
+### Step 1 — completed
+
+- `packages/domain/genesis/claude-design-package.ts`
+  - Deterministic complete package containing prompt, constraints, references.
+  - Normalizes newlines/outer whitespace, makes empty lists explicit, and
+    rejects a blank prompt.
+- `packages/domain/genesis/claude-design-package.test.ts`
+  - Exact byte-for-byte payload, empty sections, and blank-prompt tests.
+- `features/genesis/components/prototype-output-view.tsx`
+  - Now displays and copies the complete package with the label
+    “Copy complete package.”
+- `features/genesis/schema.ts` + `schema.test.ts`
+  - NFC normalization and trimming; whitespace rejection; string/URL/count
+    limits; HTTP(S)-only reference URLs; per-file, file-count, and total-byte
+    limits for future upload intake.
+- `features/genesis/errors.ts` + `errors.test.ts` + `actions.ts`
+  - Stable provider-neutral public messages; internal causes remain server logs.
+- `lib/ai/claude-cli.ts` + tests
+  - Deny-by-default environment allowlist.
+  - Explicit one-shot flags: safe mode, no slash commands, no session
+    persistence, no Chrome, no tools, strict empty MCP configuration.
+- `lib/ai/cli-runtime-policy.ts` + tests + `lib/container.ts`
+  - Refuses CLI use in production, explicit multi-user/shared modes, and known
+    hosting environments. API/placeholder remain available.
+- `.env.example` and `README.md`
+  - Document the runtime guard and isolation.
+- `vitest.config.ts`
+  - Discovers feature and benchmark tests.
+
+### Step 0 — framework implemented, evidence still missing
+
+Files under `benchmarks/` provide:
+
+- Strict fixture/material schemas with SHA-256 protected-file references.
+- The eight required scoring dimensions and 1/3/5 anchors.
+- Reproducible blinded A/B/C allocation with the answer key separated from the
+  reviewer packet.
+- Inventory status that refuses to call Khatuna, Lotus, or the gold set ready
+  while exact materials are absent.
+- Honest pending fixture manifests for Khatuna and Lotus Cafe.
+
+The following must be supplied by the owner before Step 0 can be completed:
+
+1. Exact historical Khatuna input and thin prompt.
+2. Original Khatuna logo and output screenshots/result.
+3. Exact operator edits (including an explicit “none” if applicable).
+4. Original client response and meeting/deal outcome record.
+5. Lotus Cafe logo plus Instagram URL/screenshots/exported evidence.
+6. Five to ten varied real or safely anonymized prospects. Synthetic cases do
+   not satisfy the guide.
+7. Rendered artifacts for all three approaches and completed blind scorecards.
+
+Do not substitute the synthetic Khatuna values in existing unit tests for the
+historical fixture.
+
+## Verification at handoff
+
+The following passed immediately before this handoff:
+
+```text
+npm test                 67 tests passed across 16 files
+npm run typecheck        passed
+npm run lint             passed, zero warnings
+git diff --check         passed
 ```
 
-Pass criteria (from the spec's definition of done):
-- Real decoded signals (Arabic words → likely meaning + confidence), open
-  questions with why-it-matters, loud assumptions.
-- Real kit: specific positioning; `worldFacts` that fail the any-other-shop
-  test; design prompt opens with the two mandated sentences ([buyer] replaced);
-  constraints include the hard floor; references say attach the logo.
-- Honest readiness/gates (thin brief should NOT fake a pass). No server errors.
+Run these checks again first, then run `npm run build` before committing.
 
-## Remaining work, in priority order
+## Working-tree cautions
 
-1. **Finish the live CLI verification** (above). If output quality disappoints,
-   the prompt templates are the lever: `prompts/discovery/discovery.prompt.ts`,
-   `prompts/prototype/prototype.prompt.ts` (both versioned).
-2. **Final whole-branch review of the CLI feature** (SDD protocol step not yet
-   run — the three per-task reviews were all clean, but the branch-level pass
-   for `bc3767b..b860e5f` is pending).
-3. **THE REAL TEST (the whole point):** next prospect → run through Agency OS →
-   copy the generated design prompt into Claude Design with the logo → does the
-   mockup match/beat the manual Khatuna flow? This validates the July 8
-   commitment guardrail.
-4. **Push to GitHub** (`origin = github.com/perdark/agancy-os`) — never pushed
-   this session; owner's call.
-5. **Discovery prompt v0.1.1**: persona still says clients say "something like
-   Apple" — owner corrected: Iraqi clients don't talk like that; replace with
-   real Iraqi Arabic examples (e.g. «خليها فخمة»، «ما عجبني»).
-6. Deferred minors (all recorded in `.superpowers/sdd/progress.md` and the two
-   final-review reports): zod↔JSON-Schema parity guard, stderr capture in
-   `ClaudeExec`, `resolveBackend` unit tests, worldFacts empty-state,
-   `PRICE_LEVEL_LABELS` in placeholder prose, typed stage-result accessor.
+- Preserve every current modification/untracked file; they belong to this task.
+- The benchmark worker was interrupted only after its targeted 9 tests passed.
+  Review the benchmark files before committing because no final agent review
+  was completed.
+- A read-only Fable 5 review of Step 1 was launched, then aborted when the owner
+  stopped the turn. It produced no report and made no edits.
+- `.env.local` previously selected `AGENCY_AI_BACKEND=cli`. Keep local CLI use
+  single-operator only. For production-mode checks, select `api` or
+  `placeholder`; the new guard intentionally refuses CLI in production.
+- `PRODUCT.md` and `.impeccable/live/config.json` were added because the required
+  frontend-quality workflow needed explicit product context. They preserve the
+  existing restrained design; no visual redesign was attempted.
 
-## Process context (for a future Claude session)
+## Resume sequence for Claude/Fable 5
 
-- Working pattern this session: brainstorm (skill) → spec (committed) → plan
-  (committed) → subagent-driven execution (fresh implementer per task, haiku;
-  reviewer per task, sonnet; final review, fable) → live browser verification.
-  Progress ledger: `.superpowers/sdd/progress.md`.
-- Owner style: decisive, one-word approvals ("go"), hates ceremony; spec-review
-  gates have caught real issues twice (design-DNA cut to hard floor; Iraqi
-  Arabic realism). Respect the gates, skip re-litigating settled decisions.
-- Key strategic memory (also in Claude's memory dir): the product's proven core
-  is the **pre-meeting weapon** — minimal input + logo → knockout mockup at the
-  first meeting (the Khatuna deal, zero client edits). Discovery (vague-feedback
-  decode) is the post-meeting half. Both stages exist as of today.
+1. Run `git status --short`, `npm test`, `npm run typecheck`, and `npm run lint`.
+2. Review the Step 1 diff against every checked item in the guide. If green,
+   keep Step 1 marked DONE.
+3. Review `benchmarks/` and add a short README/status command if useful, but do
+   not mark Step 0 done without the real materials and blind comparison.
+4. Ask the owner for the missing Khatuna/Lotus/gold-set files listed above.
+5. Once the guide's benchmark prerequisite is genuinely satisfied, continue
+   its immediate tasks in order:
+   - Step 2 durable draft/run persistence and resumable Prototype execution.
+   - Step 3 real logo/evidence upload with asset-storage port and provenance.
+   - Step 5 artifact import with the mockup first on the project screen.
+6. Run the complete Lotus Cafe workflow before beginning broader roadmap work.
+7. After every completed stage, update its status and checkboxes in
+   `PROJECT_COMPLETION_GUIDE.md`, with exact verification.
+
+If running Codex and Fable simultaneously later, give each a separate git
+worktree and non-overlapping files. Keep one agent as the sole owner of
+`PROJECT_COMPLETION_GUIDE.md` and final integration.
