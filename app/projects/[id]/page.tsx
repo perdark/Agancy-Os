@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  buildMeetingBrief,
   PRICE_LEVEL_LABELS,
   type DiscoveryOutput,
   type PrototypeOutput,
@@ -10,6 +12,7 @@ import { EvidenceCard } from "@/features/projects/components/evidence-card";
 import { HandoffCard } from "@/features/projects/components/handoff-card";
 import { MeetingReadinessCard } from "@/features/projects/components/meeting-readiness-card";
 import { MockupCard } from "@/features/projects/components/mockup-card";
+import { OutcomesCard } from "@/features/projects/components/outcomes-card";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
 import { CandidatesCard } from "@/features/genesis/components/candidates-card";
@@ -46,15 +49,26 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {project.identity.businessName}
-        </h1>
-        <p className="text-muted-foreground">
-          {project.identity.businessType} · {project.identity.market} ·{" "}
-          {project.identity.country} ·{" "}
-          {PRICE_LEVEL_LABELS[project.identity.priceLevel]}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {project.identity.businessName}
+          </h1>
+          <p className="text-muted-foreground">
+            {project.identity.businessType} · {project.identity.market} ·{" "}
+            {project.identity.country} ·{" "}
+            {PRICE_LEVEL_LABELS[project.identity.priceLevel]}
+          </p>
+        </div>
+        {/* Meeting Mode opens directly, without scrolling (guide §9). */}
+        {buildMeetingBrief(project) ? (
+          <Link
+            href={`/projects/${project.id}/meeting`}
+            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Open Meeting Mode
+          </Link>
+        ) : null}
       </div>
 
       {/* Guide §8: the artifact and the operator's next action come first. */}
@@ -83,6 +97,13 @@ export default async function ProjectDetailPage({
           />
         </section>
       ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Learning loop
+        </h2>
+        <OutcomesCard project={project} />
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

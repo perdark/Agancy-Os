@@ -1,5 +1,6 @@
 import type { Candidate } from "../genesis/candidate";
 import type { MockupArtifact } from "./artifacts";
+import type { MeetingOutcome } from "./outcomes";
 import type { Clock } from "../shared/clock";
 import { asHistoryEventId, asProjectId, type ProjectId } from "../shared/id";
 import type { IdGenerator } from "../shared/id";
@@ -32,6 +33,8 @@ export interface Project {
   readonly candidates: readonly Candidate[];
   /** Rendered mockups imported back from Claude Design (see MockupArtifact). */
   readonly artifacts: readonly MockupArtifact[];
+  /** What happened in real meetings — the learning loop's records. */
+  readonly outcomes: readonly MeetingOutcome[];
   readonly documents: readonly Document[];
   readonly assets: readonly Asset[];
   readonly history: readonly HistoryEvent[];
@@ -59,6 +62,7 @@ export const createProject = (
     workflow: initialWorkflow(),
     candidates: [],
     artifacts: [],
+    outcomes: [],
     documents: [],
     assets: [],
     history: [

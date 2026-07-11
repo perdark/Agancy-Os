@@ -4,6 +4,54 @@
 **Branch:** `claude/step-4-project-5d8iqp` (continues from
 `claude/agency-os-foundation-gr9yso`)
 
+## Update 2026-07-11 (final) — Steps 6, 7, 8 built; owner will test
+
+All three remaining core steps are implemented and unit-verified (210 tests
+pass, typecheck, lint, production build). **Nothing in Steps 5–8 has been
+browser-tested or run against a real prospect yet — the owner will test.**
+
+**Step 6 — artifact quality gate.** `ArtifactEvaluation`
+(`packages/domain/project/artifact-evaluation.ts`): structural checks
+(no screenshots / no logo / incomplete package) plus an independent vision
+judge behind the `ArtifactJudge` port. API backend sends real screenshot
+bytes to `claude-sonnet-5` with a versioned judge prompt
+(`artifact-judge.quality-gate@0.1.0`); cli/placeholder bind `NullArtifactJudge`
+and the stored verdict says structural-only. Violations come from a closed
+set, each with a readiness cap; final readiness = min(mean AI score, caps) —
+a fabricated-facts flag caps a 95-scored artifact to 30 (tested). Without a
+vision judge the base is 55, so structural-only never reads better than
+"warning". Verdict stored on the artifact (`evaluation` field, JSONB —
+no migration needed), history event `artifact.evaluated`, "Run quality
+gate" button on the mockup card. Meeting readiness now blocks unevaluated
+and gate-failed mockups; warnings become cautions.
+
+**Step 7 — Meeting Mode.** `buildMeetingBrief`
+(`packages/domain/project/meeting-brief.ts`) returns null until a
+presentable artifact exists; the brief carries only business name, concept
+sentence, screenshots, result URL, ≤5 assumptions, ≤5 client questions — a
+test serializes it and asserts no backend/model/prompt/readiness strings
+leak. `/projects/[id]/meeting` renders it with prev/next screen navigation;
+"Open Meeting Mode" appears in the project header.
+
+**Step 8 — learning loop.** `MeetingOutcome`
+(`packages/domain/project/outcomes.ts`): append-only records tied to the
+presented candidate (+ artifact), deal won/lost/pending, operator/client
+changes, reaction, why-it-worked, `timeToFirstArtifactMs` metric. New
+`outcomes` JSONB column + migration (`drizzle/0003_cuddly_champions.sql`),
+codec, history event `outcome.recorded`, outcomes card + form on the
+project screen.
+
+**What the owner should test in the browser (all of Steps 5–8):**
+intake → copy package → run in Claude Design → import screenshots →
+run the quality gate → check readiness states → open Meeting Mode →
+record an outcome. Then the Lotus Cafe acceptance test end-to-end.
+
+**Known limitations:** the vision judge requires `AGENCY_AI_BACKEND=api`
+with `ANTHROPIC_API_KEY` (the CLI one-shot has no image path — structural-
+only there); desktop-vs-mobile screenshot distinction is not modelled yet
+(the judge sees all screenshots together); Step 0 (benchmark materials) and
+Step 3's evidence fact-extraction remain open.
+
 ## Update 2026-07-11 (latest) — Step 5 DONE (browser check deferred)
 
 Guide §7 Step 5 (close the Claude Design handoff) is implemented:

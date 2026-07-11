@@ -8,4 +8,8 @@ export * from "./history";
 export * from "./project";
 export * from "./repository";
 export * from "./artifacts";
+export * from "./artifact-evaluation";
+export * from "./artifact-judge";
 export * from "./meeting-readiness";
+export * from "./meeting-brief";
+export * from "./outcomes";

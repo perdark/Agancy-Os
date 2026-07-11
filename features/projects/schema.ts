@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEAL_STATUSES } from "@/domain";
 
 /**
  * Edge validation for the artifact-import return step. Screenshot bytes stay
@@ -81,6 +82,29 @@ export const mockupScreenshotSchema = z.object({
       ARTIFACT_IMPORT_LIMITS.screenshotBytes,
       `Each screenshot must be ${ARTIFACT_IMPORT_LIMITS.screenshotBytes} bytes or smaller`,
     ),
+});
+
+export const OUTCOME_TEXT_LIMIT = 1_000;
+
+/** Edge validation for recording a meeting outcome (guide Step 8). */
+export const outcomeSchema = z.object({
+  projectId: requiredText("Project id", 64),
+  candidateId: requiredText("Candidate id", 64),
+  artifactId: boundedText("Artifact id", 64).default(""),
+  deal: z.enum(DEAL_STATUSES),
+  operatorChanges: boundedText("Operator changes", OUTCOME_TEXT_LIMIT).default(
+    "",
+  ),
+  clientChanges: boundedText("Client changes", OUTCOME_TEXT_LIMIT).default(""),
+  reaction: boundedText("Reaction", OUTCOME_TEXT_LIMIT).default(""),
+  whyItWorked: boundedText("Why it worked", OUTCOME_TEXT_LIMIT).default(""),
+});
+
+export type OutcomeFormValues = z.input<typeof outcomeSchema>;
+
+export const evaluateArtifactSchema = z.object({
+  projectId: requiredText("Project id", 64),
+  artifactId: requiredText("Artifact id", 64),
 });
 
 export const mockupScreenshotBatchSchema = z

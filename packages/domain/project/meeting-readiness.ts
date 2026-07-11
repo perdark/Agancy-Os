@@ -5,22 +5,27 @@ import type { Project } from "./project";
  * this?". Derived, never stored: it is a pure function of the aggregate so it
  * can never drift from the project's actual state.
  *
- * The rule the guide is emphatic about (§6.1, Step 5): a project is NEVER
- * meeting-ready while only a prompt exists. A rendered mockup must be
- * imported and stored first. The independent quality gate (Step 6) will add
- * a further cap on top of this; until it exists, an imported mockup is
- * "ready" with an explicit caution that no gate has evaluated it.
+ * The rules the guide is emphatic about:
+ *  - a project is NEVER meeting-ready while only a prompt exists (§6.1,
+ *    Step 5) — a rendered mockup must be imported and stored first;
+ *  - the rendered artifact must pass the INDEPENDENT quality gate (Step 6) —
+ *    an unevaluated or gate-failed mockup blocks readiness, and a gate
+ *    warning is surfaced as cautions the operator reviews before presenting.
  */
 export type MeetingReadinessStatus =
   | "no-package"
   | "prompt-only"
-  | "mockup-imported";
+  | "mockup-unevaluated"
+  | "gate-failed"
+  | "ready";
 
 export const MEETING_READINESS_LABELS: Record<MeetingReadinessStatus, string> =
   {
     "no-package": "No generation package yet",
     "prompt-only": "Not meeting-ready — prompt only",
-    "mockup-imported": "Mockup imported",
+    "mockup-unevaluated": "Mockup imported — not evaluated",
+    "gate-failed": "Quality gate failed",
+    ready: "Meeting ready",
   };
 
 export interface MeetingReadiness {
@@ -62,12 +67,47 @@ export const assessMeetingReadiness = (project: Project): MeetingReadiness => {
     };
   }
 
+  const evaluation = project.artifacts.at(-1)?.evaluation;
+  if (!evaluation) {
+    return {
+      status: "mockup-unevaluated",
+      ready: false,
+      blockers: [
+        "The imported mockup has not been evaluated — run the quality gate before presenting.",
+        ...(hasLogo ? [] : [logoGap]),
+      ],
+      cautions: [],
+    };
+  }
+
+  if (evaluation.gate === "fail") {
+    return {
+      status: "gate-failed",
+      ready: false,
+      blockers: [
+        `The quality gate failed (readiness ${evaluation.readiness}/100).`,
+        ...evaluation.violations.map((entry) => entry.label),
+      ],
+      cautions: [],
+    };
+  }
+
   return {
-    status: "mockup-imported",
+    status: "ready",
     ready: true,
     blockers: [],
     cautions: [
-      "The mockup has not been evaluated by an independent quality gate yet (Step 6).",
+      ...(evaluation.gate === "warning"
+        ? [
+            `The quality gate passed with warnings (readiness ${evaluation.readiness}/100) — review before presenting.`,
+            ...evaluation.violations.map((entry) => entry.label),
+          ]
+        : []),
+      ...(evaluation.scores
+        ? []
+        : [
+            "No vision judge ran on this backend — the verdict is structural-only.",
+          ]),
       ...(hasLogo ? [] : [logoGap]),
     ],
   };

@@ -297,6 +297,17 @@ together with the Lotus Cafe acceptance test.
 
 ### Step 6: Add an artifact quality gate
 
+**Status: DONE — 2026-07-11** (built; not yet exercised in a browser or on a
+real prospect — the owner will test). The gate combines pure structural
+checks over the aggregate with an independent vision judge
+(`ArtifactJudge` port; API transport sends the actual screenshot bytes,
+cli/placeholder bind a null judge and the verdict honestly records
+structural-only, capped at "warning"). Every violation carries a readiness
+cap and the final readiness is min(AI score, all caps), so a deterministic
+failure caps readiness regardless of the AI score. The verdict is stored on
+the artifact and drives meeting readiness: unevaluated or gate-failed
+mockups block; warnings surface as cautions.
+
 Evaluate the actual desktop and mobile screenshots for:
 
 - Logo and brand fidelity.
@@ -314,6 +325,13 @@ blank screens, or a prompt that omits required package sections.
 
 ### Step 7: Build Meeting Mode
 
+**Status: DONE — 2026-07-11** (built; owner to test in browser).
+`/projects/[id]/meeting` opens directly from the project header once a
+presentable artifact exists. The page renders only a `MeetingBrief` — a
+domain type that structurally cannot carry diagnostics, model names,
+prompt provenance, or stage mechanics (tested by serializing the brief and
+asserting internals are absent).
+
 Meeting Mode should show:
 
 1. The selected mockup immediately.
@@ -327,6 +345,12 @@ The client should not see implementation diagnostics, model errors, stage
 contracts, or internal confidence mechanics.
 
 ### Step 8: Build the learning loop
+
+**Status: DONE — 2026-07-11** (built; owner to test in browser). Meeting
+outcomes are append-only records tied to the presented candidate (and
+artifact when shown): deal won/lost/pending, operator changes, client
+changes, reaction, and why the direction worked — plus the intake→first
+artifact time metric. Recorded through a form on the project screen.
 
 Record:
 

@@ -6,7 +6,13 @@ import {
 } from "../shared/id";
 import type { Candidate } from "../genesis/candidate";
 import type { GenesisInput } from "../genesis/genesis-input";
-import { latestArtifact, withArtifact, type MockupArtifact } from "./artifacts";
+import { combineEvaluation, violation } from "./artifact-evaluation";
+import {
+  latestArtifact,
+  withArtifact,
+  withArtifactEvaluation,
+  type MockupArtifact,
+} from "./artifacts";
 import { assessMeetingReadiness } from "./meeting-readiness";
 import { createProject, type Project } from "./project";
 
@@ -101,16 +107,57 @@ describe("assessMeetingReadiness", () => {
     expect(readiness.blockers.join(" ")).toMatch(/no logo/i);
   });
 
-  it("becomes ready once a mockup is imported, with the quality gate as an explicit caution", () => {
+  it("blocks an imported mockup until the quality gate has run", () => {
     const project = withArtifact(
       withLogo({ ...baseProject(), candidates: [candidate] }),
       artifact,
     );
     const readiness = assessMeetingReadiness(project);
-    expect(readiness.status).toBe("mockup-imported");
+    expect(readiness.status).toBe("mockup-unevaluated");
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers.join(" ")).toMatch(/quality gate/i);
+  });
+
+  it("blocks when the gate failed, naming every violation", () => {
+    const evaluated = combineEvaluation({
+      structural: [violation("blank-screen")],
+      verdict: null,
+      judgeBackend: "none",
+      at: new Date(2_000),
+    });
+    const project = withArtifactEvaluation(
+      withArtifact(
+        withLogo({ ...baseProject(), candidates: [candidate] }),
+        artifact,
+      ),
+      artifact.id,
+      evaluated,
+    );
+    const readiness = assessMeetingReadiness(project);
+    expect(readiness.status).toBe("gate-failed");
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers.join(" ")).toMatch(/blank/i);
+  });
+
+  it("is ready after a clean structural-only evaluation, with honest cautions", () => {
+    const evaluated = combineEvaluation({
+      structural: [],
+      verdict: null,
+      judgeBackend: "none",
+      at: new Date(2_000),
+    });
+    const project = withArtifactEvaluation(
+      withArtifact(
+        withLogo({ ...baseProject(), candidates: [candidate] }),
+        artifact,
+      ),
+      artifact.id,
+      evaluated,
+    );
+    const readiness = assessMeetingReadiness(project);
+    expect(readiness.status).toBe("ready");
     expect(readiness.ready).toBe(true);
-    expect(readiness.blockers).toEqual([]);
-    expect(readiness.cautions.join(" ")).toMatch(/quality gate/i);
+    expect(readiness.cautions.join(" ")).toMatch(/structural-only/i);
   });
 });
 

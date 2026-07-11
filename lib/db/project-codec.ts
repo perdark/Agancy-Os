@@ -5,6 +5,7 @@ import {
   asCandidateId,
   asDocumentId,
   asHistoryEventId,
+  asOutcomeId,
   asProjectId,
   ASSET_SOURCES,
   PRICE_LEVELS,
@@ -162,14 +163,80 @@ const candidates = z
   .nullish()
   .transform((value) => value ?? []);
 
+const evaluation = z.object({
+  violations: z.array(
+    z.object({
+      id: z.enum([
+        "no-screenshots",
+        "missing-logo-asset",
+        "package-missing-sections",
+        "missing-logo-in-mockup",
+        "missing-primary-action",
+        "fabricated-facts",
+        "broken-rtl",
+        "overflow",
+        "blank-screen",
+        "generic-template",
+      ]),
+      label: z.string(),
+      cap: z.number(),
+      detail: z.string().optional(),
+    }),
+  ),
+  scores: z
+    .array(
+      z.object({
+        criterion: z.enum([
+          "brandFidelity",
+          "specificity",
+          "taskClarity",
+          "contentTruth",
+          "responsiveQuality",
+          "localRelevance",
+          "presentationReadiness",
+        ]),
+        score: z.number(),
+        note: z.string(),
+      }),
+    )
+    .optional(),
+  summary: z.string().optional(),
+  readiness: z.number().transform(readinessScore),
+  gate: z.enum(["pass", "warning", "fail"]),
+  judge: z.object({
+    backend: z.string(),
+    model: z.string().optional(),
+  }),
+  evaluatedAt: date,
+});
+
 const artifact = z.object({
   id: z.string().transform(asArtifactId),
   candidateId: z.string().transform(asCandidateId),
   screenshotAssetIds: z.array(z.string().transform(asAssetId)),
   resultUrl: z.string().optional(),
   note: z.string().optional(),
+  evaluation: evaluation.optional(),
   importedAt: date,
 });
+
+const outcome = z.object({
+  id: z.string().transform(asOutcomeId),
+  candidateId: z.string().transform(asCandidateId),
+  artifactId: z.string().transform(asArtifactId).optional(),
+  operatorChanges: z.string().optional(),
+  clientChanges: z.string().optional(),
+  reaction: z.string().optional(),
+  deal: z.enum(["won", "lost", "pending"]),
+  whyItWorked: z.string().optional(),
+  recordedAt: date,
+});
+
+/** Rows written before the learning loop existed have none; default them. */
+const outcomes = z
+  .array(outcome)
+  .nullish()
+  .transform((value) => value ?? []);
 
 /** Rows written before artifact import existed have none; default them. */
 const artifacts = z
@@ -219,6 +286,21 @@ const historyEvent = z.discriminatedUnion("type", [
     artifactId: z.string(),
     candidateId: z.string(),
     screenshots: z.number().int().nonnegative(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("artifact.evaluated"),
+    artifactId: z.string(),
+    gate: z.string(),
+    readiness: z.number(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("outcome.recorded"),
+    outcomeId: z.string(),
+    deal: z.string(),
     at: date,
   }),
 ]);
@@ -302,6 +384,7 @@ export const toProjectRow = (project: Project): NewProjectRow => ({
   workflowRuns: project.workflow.runs,
   candidates: project.candidates,
   artifacts: project.artifacts,
+  outcomes: project.outcomes,
   documents: project.documents,
   assets: project.assets,
   history: project.history,
@@ -340,6 +423,7 @@ export const toProject = (row: ProjectRow): Project => {
     workflow,
     candidates: candidates.parse(row.candidates) as Project["candidates"],
     artifacts: artifacts.parse(row.artifacts),
+    outcomes: outcomes.parse(row.outcomes),
     documents: document.array().parse(row.documents),
     assets: asset.array().parse(row.assets),
     history: historyEvent.array().parse(row.history),

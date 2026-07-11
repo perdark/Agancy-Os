@@ -8,11 +8,19 @@ import {
   importMockupArtifact,
   type StoredScreenshotInput,
 } from "./artifact-import";
+import {
+  ArtifactEvaluationError,
+  evaluateArtifact,
+} from "./evaluate-artifact";
 import { PROJECTS_PUBLIC_ERROR_MESSAGES } from "./errors";
+import { OutcomeRecordError, recordMeetingOutcome } from "./record-outcome";
 import {
   artifactImportFieldsSchema,
+  evaluateArtifactSchema,
   mockupScreenshotBatchSchema,
   mockupScreenshotSchema,
+  outcomeSchema,
+  type OutcomeFormValues,
 } from "./schema";
 
 export type ArtifactImportActionResult =
@@ -92,5 +100,85 @@ export const importProjectArtifact = async (
       return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
     }
     return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.importFailed };
+  }
+};
+
+/**
+ * Run the quality gate over one imported artifact. The judge transport comes
+ * from the container (vision on the API backend; structural-only elsewhere,
+ * and the stored verdict says so).
+ */
+export const evaluateProjectArtifact = async (values: {
+  projectId: string;
+  artifactId: string;
+}): Promise<ArtifactImportActionResult> => {
+  const parsed = evaluateArtifactSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+  }
+
+  try {
+    const { projects, context, assetStorage, artifactJudge, aiBackend } =
+      getContainer();
+    const { project } = await evaluateArtifact(
+      {
+        projectId: asProjectId(parsed.data.projectId),
+        artifactId: parsed.data.artifactId,
+      },
+      {
+        projects,
+        assetStorage,
+        judge: artifactJudge,
+        judgeBackend: aiBackend,
+        ids: context.ids,
+        clock: context.clock,
+      },
+    );
+    revalidatePath(`/projects/${project.id}`);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    console.error("Artifact evaluation failed:", error);
+    if (error instanceof ArtifactEvaluationError) {
+      return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+    }
+    return {
+      ok: false,
+      error: PROJECTS_PUBLIC_ERROR_MESSAGES.evaluationFailed,
+    };
+  }
+};
+
+/** Record what happened in the meeting (guide Step 8). Append-only. */
+export const recordProjectOutcome = async (
+  values: OutcomeFormValues,
+): Promise<ArtifactImportActionResult> => {
+  const parsed = outcomeSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+  }
+
+  try {
+    const { projects, context } = getContainer();
+    const { project } = await recordMeetingOutcome(
+      {
+        projectId: asProjectId(parsed.data.projectId),
+        candidateId: parsed.data.candidateId,
+        artifactId: parsed.data.artifactId || undefined,
+        deal: parsed.data.deal,
+        operatorChanges: parsed.data.operatorChanges,
+        clientChanges: parsed.data.clientChanges,
+        reaction: parsed.data.reaction,
+        whyItWorked: parsed.data.whyItWorked,
+      },
+      { projects, ids: context.ids, clock: context.clock },
+    );
+    revalidatePath(`/projects/${project.id}`);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    console.error("Outcome recording failed:", error);
+    if (error instanceof OutcomeRecordError) {
+      return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+    }
+    return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.outcomeFailed };
   }
 };

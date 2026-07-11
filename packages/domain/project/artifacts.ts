@@ -1,4 +1,5 @@
 import type { ArtifactId, AssetId, CandidateId } from "../shared/id";
+import type { ArtifactEvaluation } from "./artifact-evaluation";
 import type { Project } from "./project";
 
 /**
@@ -21,6 +22,8 @@ export interface MockupArtifact {
   readonly resultUrl?: string;
   /** Operator note — what this render is, what was changed by hand. */
   readonly note?: string;
+  /** The quality gate's verdict, once the artifact has been evaluated. */
+  readonly evaluation?: ArtifactEvaluation;
   readonly importedAt: Date;
 }
 
@@ -38,3 +41,16 @@ export const withArtifact = (
 export const latestArtifact = (
   project: Project,
 ): MockupArtifact | undefined => project.artifacts.at(-1);
+
+/** Attach an evaluation to one artifact, returning a new Project. */
+export const withArtifactEvaluation = (
+  project: Project,
+  artifactId: ArtifactId,
+  evaluation: ArtifactEvaluation,
+): Project => ({
+  ...project,
+  artifacts: project.artifacts.map((artifact) =>
+    artifact.id === artifactId ? { ...artifact, evaluation } : artifact,
+  ),
+  updatedAt: evaluation.evaluatedAt,
+});

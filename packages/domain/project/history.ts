@@ -15,7 +15,9 @@ export type HistoryEvent =
   | StageAdvancedEvent
   | DocumentAddedEvent
   | CandidateAddedEvent
-  | ArtifactImportedEvent;
+  | ArtifactImportedEvent
+  | ArtifactEvaluatedEvent
+  | OutcomeRecordedEvent;
 
 interface HistoryEventBase {
   readonly id: HistoryEventId;
@@ -58,6 +60,19 @@ export interface ArtifactImportedEvent extends HistoryEventBase {
   readonly artifactId: string;
   readonly candidateId: string;
   readonly screenshots: number;
+}
+
+export interface ArtifactEvaluatedEvent extends HistoryEventBase {
+  readonly type: "artifact.evaluated";
+  readonly artifactId: string;
+  readonly gate: string;
+  readonly readiness: number;
+}
+
+export interface OutcomeRecordedEvent extends HistoryEventBase {
+  readonly type: "outcome.recorded";
+  readonly outcomeId: string;
+  readonly deal: string;
 }
 
 export type HistoryEventType = HistoryEvent["type"];
