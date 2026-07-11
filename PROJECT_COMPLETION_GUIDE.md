@@ -276,12 +276,24 @@ Desktop and mobile inspected; no overflow.
 
 ### Step 5: Close the Claude Design handoff
 
-- Present one dominant "Open in Claude Design" or "Copy complete package"
-  action.
-- Verify that all required assets are attached before generation.
-- Provide a clear return step for importing screenshots or a result URL.
-- Store the returned artifact beside its prompt, assets, and model metadata.
-- Never label the project "meeting ready" while only a prompt exists.
+**Status: DONE — 2026-07-11.** Verified with 190 passing tests (meeting
+readiness derivation, artifact import use-case, PGlite round-trips of
+artifacts and mockup assets), TypeScript, lint, and production build.
+Browser verification deliberately deferred at the owner's request — run it
+together with the Lotus Cafe acceptance test.
+
+- [x] Present one dominant "Copy complete package" action (the handoff card
+  leads the project screen with the selected candidate's package).
+- [x] Verify that all required assets are attached before generation (the
+  handoff card lists every uploaded attachment and warns loudly when no
+  logo exists).
+- [x] Provide a clear return step for importing screenshots or a result URL.
+- [x] Store the returned artifact beside its prompt, assets, and model
+  metadata (`MockupArtifact` links to the candidate whose package produced
+  it; the candidate already pins prompt, inputs, and model).
+- [x] Never label the project "meeting ready" while only a prompt exists
+  (`assessMeetingReadiness` is a pure domain function; prompt-only projects
+  are structurally unable to read as ready).
 
 ### Step 6: Add an artifact quality gate
 
@@ -416,8 +428,8 @@ Execute these in order:
    **Done 2026-07-10.**
 4. ~~Implement real logo and evidence upload with previews and source
    metadata.~~ **Done 2026-07-11 (browser-verified).**
-5. Add artifact import and make the mockup the first content on the project
-   screen.
+5. ~~Add artifact import and make the mockup the first content on the project
+   screen.~~ **Done 2026-07-11.**
 
 Do not begin another Agency OS stage until these five tasks are complete and the
 Lotus Cafe acceptance test has been run through the full workflow.

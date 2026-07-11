@@ -1,4 +1,5 @@
 import type { Candidate } from "../genesis/candidate";
+import type { MockupArtifact } from "./artifacts";
 import type { Clock } from "../shared/clock";
 import { asHistoryEventId, asProjectId, type ProjectId } from "../shared/id";
 import type { IdGenerator } from "../shared/id";
@@ -29,6 +30,8 @@ export interface Project {
   readonly workflow: Workflow;
   /** Stored prototype directions, each with the exact inputs that made it. */
   readonly candidates: readonly Candidate[];
+  /** Rendered mockups imported back from Claude Design (see MockupArtifact). */
+  readonly artifacts: readonly MockupArtifact[];
   readonly documents: readonly Document[];
   readonly assets: readonly Asset[];
   readonly history: readonly HistoryEvent[];
@@ -55,6 +58,7 @@ export const createProject = (
     knowledge: emptyKnowledge(),
     workflow: initialWorkflow(),
     candidates: [],
+    artifacts: [],
     documents: [],
     assets: [],
     history: [

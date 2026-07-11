@@ -15,6 +15,13 @@
       "when": 1783729678247,
       "tag": "0001_dapper_texas_twister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783733280529,
+      "tag": "0002_flowery_maddog",
+      "breakpoints": true
     }
   ]
 }

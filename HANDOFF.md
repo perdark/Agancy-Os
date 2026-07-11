@@ -4,6 +4,47 @@
 **Branch:** `claude/step-4-project-5d8iqp` (continues from
 `claude/agency-os-foundation-gr9yso`)
 
+## Update 2026-07-11 (latest) — Step 5 DONE (browser check deferred)
+
+Guide §7 Step 5 (close the Claude Design handoff) is implemented:
+
+- **`MockupArtifact`** (`packages/domain/project/artifacts.ts`): screenshots
+  and/or a result URL imported back from Claude Design, tied to the
+  CANDIDATE whose package produced it (the candidate already pins prompt,
+  inputs, and model — no duplication). Screenshots are stored through the
+  asset-storage port as assets of new kind `"mockup"` and stream back
+  through the existing asset route.
+- **Meeting readiness** (`packages/domain/project/meeting-readiness.ts`):
+  pure derivation — `no-package` / `prompt-only` / `mockup-imported`. A
+  prompt-only project can never read as ready; a missing logo is a named
+  blocker; an imported mockup is ready with an explicit caution that the
+  Step 6 quality gate does not exist yet.
+- **Mockup-first project screen** (guide §8): Selected mockup → Meeting
+  readiness → the ONE dominant handoff card ("Copy complete package" for
+  the selected candidate + attach-checklist + import form) → workflow →
+  candidates → brief/evidence → stage details. The duplicate package card
+  was removed from the Prototype stage view. Mockup screenshots are
+  excluded from the evidence locker.
+- `importProjectArtifact` server action: multipart (screenshots
+  image-allowlisted, 10MB each / 50MB total / 12 max, URL and note
+  bounded), bytes through the asset-storage port, stable public errors.
+  New `artifacts` JSONB column + migration
+  (`drizzle/0002_flowery_maddog.sql`); legacy rows decode to `[]`.
+
+**Verification performed:** 190 tests pass (11 new), typecheck, lint zero
+warnings, production build. **Browser verification deliberately deferred at
+the owner's request** — the import flow and mockup-first layout have NOT
+been driven in a real browser yet; do that together with the Lotus Cafe
+acceptance test.
+
+**Remaining gap to a meeting-ready artifact:** the Step 6 quality gate
+(evaluate the rendered screenshots; deterministic failures cap readiness).
+Step 3's evidence fact-extraction with citations and Step 0's owner
+materials remain open. §11's five immediate tasks are now complete except
+task 2 (blocked on owner); the Lotus Cafe acceptance test through the full
+workflow — including a real Claude Design run and import — has not been
+executed.
+
 ## Update 2026-07-11 (later) — Step 4 DONE, Step 3 browser-verified
 
 Guide §7 Step 4 (candidate directions) is complete:

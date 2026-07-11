@@ -14,7 +14,8 @@ export type HistoryEvent =
   | StageRunEvent
   | StageAdvancedEvent
   | DocumentAddedEvent
-  | CandidateAddedEvent;
+  | CandidateAddedEvent
+  | ArtifactImportedEvent;
 
 interface HistoryEventBase {
   readonly id: HistoryEventId;
@@ -50,6 +51,13 @@ export interface CandidateAddedEvent extends HistoryEventBase {
   readonly approach: string;
   /** Set when the candidate came from a scoped regeneration. */
   readonly scope?: string;
+}
+
+export interface ArtifactImportedEvent extends HistoryEventBase {
+  readonly type: "artifact.imported";
+  readonly artifactId: string;
+  readonly candidateId: string;
+  readonly screenshots: number;
 }
 
 export type HistoryEventType = HistoryEvent["type"];

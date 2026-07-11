@@ -7,3 +7,5 @@ export * from "./asset-storage";
 export * from "./history";
 export * from "./project";
 export * from "./repository";
+export * from "./artifacts";
+export * from "./meeting-readiness";

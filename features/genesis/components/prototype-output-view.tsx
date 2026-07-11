@@ -1,25 +1,21 @@
-import {
-  buildClaudeDesignPackage,
-  type PrototypeOutput,
-} from "@/domain";
+import { type PrototypeOutput } from "@/domain";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CopyButton } from "@/components/ui/copy-button";
 
 /**
- * Renders the Prototype deliverables — the first-meeting kit. The centrepiece
- * is the paste-ready Claude Design prompt; everything above it is the
- * strategist's invisible work (assumptions, positioning, world facts) made
- * visible so the operator can correct it at the meeting.
+ * Renders the Prototype deliverables — the strategist's invisible work
+ * (assumptions, positioning, world facts) made visible so the operator can
+ * correct it at the meeting. The paste-ready package itself is NOT repeated
+ * here: the handoff card at the top of the project screen is the one
+ * dominant copy action (guide Step 5), and candidate cards keep per-version
+ * copies.
  */
 export function PrototypeOutputView({ output }: { output: PrototypeOutput }) {
-  const { brandAssumptions, positioning, prototypeDirection, designPrompt } =
-    output;
-  const completePackage = buildClaudeDesignPackage(designPrompt);
+  const { brandAssumptions, positioning, prototypeDirection } = output;
 
   return (
     <div className="grid gap-4">
@@ -64,23 +60,6 @@ export function PrototypeOutputView({ output }: { output: PrototypeOutput }) {
           items={prototypeDirection.worldFacts}
         />
       </Block>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base">Claude Design package</CardTitle>
-            <CopyButton
-              text={completePackage}
-              label="Copy complete package"
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs leading-relaxed">
-            {completePackage}
-          </pre>
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -7,6 +7,9 @@ import {
 } from "@/domain";
 import { getProject } from "@/features/projects/service";
 import { EvidenceCard } from "@/features/projects/components/evidence-card";
+import { HandoffCard } from "@/features/projects/components/handoff-card";
+import { MeetingReadinessCard } from "@/features/projects/components/meeting-readiness-card";
+import { MockupCard } from "@/features/projects/components/mockup-card";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
 import { CandidatesCard } from "@/features/genesis/components/candidates-card";
@@ -54,6 +57,13 @@ export default async function ProjectDetailPage({
         </p>
       </div>
 
+      {/* Guide §8: the artifact and the operator's next action come first. */}
+      <section className="space-y-3">
+        <MockupCard project={project} />
+        <MeetingReadinessCard project={project} />
+        <HandoffCard project={project} />
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Workflow
@@ -95,7 +105,12 @@ export default async function ProjectDetailPage({
             ) : null}
           </CardContent>
         </Card>
-        <EvidenceCard projectId={project.id} assets={project.assets} />
+        {/* Mockup screenshots live in the Selected mockup card, not the
+            evidence locker. */}
+        <EvidenceCard
+          projectId={project.id}
+          assets={project.assets.filter((asset) => asset.kind !== "mockup")}
+        />
       </section>
 
       {genesis ? (

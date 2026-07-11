@@ -100,3 +100,15 @@ export const candidateClipboardPayload = (candidate: Candidate): string =>
   candidate.regeneration && candidate.regeneration.scope !== "entire"
     ? candidate.designPrompt.prompt
     : buildClaudeDesignPackage(candidate.designPrompt);
+
+/** Whether a candidate carries a complete package (not a scoped amendment). */
+export const isFullCandidate = (candidate: Candidate): boolean =>
+  !candidate.regeneration || candidate.regeneration.scope === "entire";
+
+/**
+ * The candidate the handoff leads with: the newest complete package. Scoped
+ * amendments never lead — they belong to the session of their parent.
+ */
+export const selectedCandidate = (
+  candidates: readonly Candidate[],
+): Candidate | undefined => candidates.filter(isFullCandidate).at(-1);

@@ -1,4 +1,5 @@
 import {
+  asArtifactId,
   asAssetId,
   asCandidateId,
   asDocumentId,
@@ -220,6 +221,16 @@ export const buildMaximalProject = (): Project => {
         createdAt: t(34),
       },
     ],
+    artifacts: [
+      {
+        id: asArtifactId("art-1"),
+        candidateId: asCandidateId("cand-2"),
+        screenshotAssetIds: [asAssetId("asset-3")],
+        resultUrl: "https://claude.ai/share/lotus-mockup",
+        note: "Desktop render, first pass.",
+        importedAt: t(35),
+      },
+    ],
     documents: [
       {
         id: asDocumentId("doc-1"),
@@ -251,6 +262,18 @@ export const buildMaximalProject = (): Project => {
         source: "operator-link",
         uri: "https://example.com/shot.png",
         addedAt: t(4),
+      },
+      {
+        id: asAssetId("asset-3"),
+        label: "mockup-home.png",
+        kind: "mockup",
+        source: "operator-upload",
+        uri: `asset://${"f".repeat(64)}`,
+        mimeType: "image/png",
+        checksum: "f".repeat(64),
+        sizeBytes: 8_192,
+        fileName: "mockup-home.png",
+        addedAt: t(35),
       },
     ],
     history: [
@@ -288,6 +311,14 @@ export const buildMaximalProject = (): Project => {
         approach: "evidence-enriched",
         scope: "assumption",
         at: t(34),
+      },
+      {
+        id: asHistoryEventId("h-6"),
+        type: "artifact.imported",
+        artifactId: "art-1",
+        candidateId: "cand-2",
+        screenshots: 1,
+        at: t(35),
       },
     ],
     createdAt: t(0),

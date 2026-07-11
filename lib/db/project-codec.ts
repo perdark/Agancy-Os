@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  asArtifactId,
   asAssetId,
   asCandidateId,
   asDocumentId,
@@ -161,6 +162,21 @@ const candidates = z
   .nullish()
   .transform((value) => value ?? []);
 
+const artifact = z.object({
+  id: z.string().transform(asArtifactId),
+  candidateId: z.string().transform(asCandidateId),
+  screenshotAssetIds: z.array(z.string().transform(asAssetId)),
+  resultUrl: z.string().optional(),
+  note: z.string().optional(),
+  importedAt: date,
+});
+
+/** Rows written before artifact import existed have none; default them. */
+const artifacts = z
+  .array(artifact)
+  .nullish()
+  .transform((value) => value ?? []);
+
 const historyEvent = z.discriminatedUnion("type", [
   z.object({
     id: z.string().transform(asHistoryEventId),
@@ -197,12 +213,20 @@ const historyEvent = z.discriminatedUnion("type", [
     scope: z.string().optional(),
     at: date,
   }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("artifact.imported"),
+    artifactId: z.string(),
+    candidateId: z.string(),
+    screenshots: z.number().int().nonnegative(),
+    at: date,
+  }),
 ]);
 
 const asset = z.object({
   id: z.string().transform(asAssetId),
   label: z.string(),
-  kind: z.enum(["logo", "image", "document", "reference", "other"]),
+  kind: z.enum(["logo", "image", "document", "reference", "mockup", "other"]),
   uri: z.string(),
   mimeType: z.string().optional(),
   // Rows written before uploads existed only ever held operator links.
@@ -277,6 +301,7 @@ export const toProjectRow = (project: Project): NewProjectRow => ({
   workflowResults: project.workflow.results,
   workflowRuns: project.workflow.runs,
   candidates: project.candidates,
+  artifacts: project.artifacts,
   documents: project.documents,
   assets: project.assets,
   history: project.history,
@@ -314,6 +339,7 @@ export const toProject = (row: ProjectRow): Project => {
     knowledge: knowledge.parse(row.knowledge),
     workflow,
     candidates: candidates.parse(row.candidates) as Project["candidates"],
+    artifacts: artifacts.parse(row.artifacts),
     documents: document.array().parse(row.documents),
     assets: asset.array().parse(row.assets),
     history: historyEvent.array().parse(row.history),
