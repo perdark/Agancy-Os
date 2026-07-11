@@ -1,9 +1,64 @@
 # HANDOFF — session state
 
 **Date:** 2026-07-11 (Claude/Fable 5; owner continuing from mobile)
-**Branch:** `claude/agency-os-foundation-gr9yso`
+**Branch:** `claude/step-4-project-5d8iqp` (continues from
+`claude/agency-os-foundation-gr9yso`)
+
+## Update 2026-07-11 (later) — Step 4 DONE, Step 3 browser-verified
+
+Guide §7 Step 4 (candidate directions) is complete:
+
+- Every generation now records **two candidates** on the project: a
+  deterministic **thin-baseline** package (versioned template
+  `thin-baseline.first-meeting@0.1.0` — the Khatuna control, recorded even
+  when AI generation fails) and the **evidence-enriched** package from the
+  Prototype stage. Each candidate stores its exact inputs: brief snapshot,
+  Discovery snapshot, prompt id/version/SHA-256, backend, and actual model
+  (`packages/domain/genesis/candidate.ts`).
+- The prototype prompt is now **v0.2.0**: the global Arabic-RTL/mobile/
+  commerce hard floor was replaced by a universal truthfulness-first floor
+  plus prospect-conditional rules
+  (`packages/domain/genesis/prospect-rules.ts`) — each active rule names the
+  brief trigger that switched it on. A Georgian cafe gets no RTL rules; an
+  Iraqi one does.
+- **Scoped regeneration** (`regenerateCandidateRun` in the genesis runner):
+  `entire` re-runs Prototype through the persisted stage lifecycle with the
+  operator's correction injected as overriding truth (port gained optional
+  `PrototypeGenerationOptions.directives`); `screen`/`copy`/`layout`/
+  `assumption` build a deterministic paste-ready `CLAUDE DESIGN AMENDMENT`
+  for the same Claude Design session. Every regeneration appends a NEW
+  candidate linked to its parent — nothing is overwritten.
+- Candidates render on the project page above the Brief (guide §8 order),
+  newest first, with copy actions, provenance lines, and a per-candidate
+  regenerate form. New `candidates` JSONB column + migration
+  (`drizzle/0001_dapper_texas_twister.sql`); legacy rows decode to `[]` and
+  are backfilled with both candidates on their next resume.
+
+**Verification performed:** 179 tests pass (28 new: prospect rules, thin
+template, amendment bytes, clipboard payloads, runner candidate recording,
+all regeneration paths, PGlite candidate round-trips with Date revival),
+typecheck, lint zero warnings, production build. Browser (placeholder
+backend, dev server): intake with real logo + evidence PNG uploads →
+previews rendered → bytes stored under `.data/assets/` and served 200 via
+the asset route (closes Step 3's open browser check) → both candidates
+listed with provenance → "one screen" regeneration added an amendment
+candidate → "entire" regeneration re-ran Prototype (attempts 2) and added a
+full candidate with the correct copy label. Desktop + mobile screenshots
+inspected; no horizontal overflow. Browser verification found and fixed two
+UI defects: entire-scope regenerations mislabelled "Copy amendment", and the
+regenerate form kept a stale scope when reopened.
+
+**Remaining gap to a meeting-ready artifact:** candidates are still prompt
+packages — no rendered mockup is stored yet. Next in order: guide §11 task 5
+/ §7 Step 5 — artifact import (screenshots or URL) and mockup-first project
+screen; then the Step 6 quality gate. Step 3's evidence fact-extraction with
+citations also remains open. The CLI backend has not re-verified this slice
+(this container has no `claude` CLI); the placeholder run exercised the full
+persistence and UI path, and the CLI transport only changed by passing
+`directives` through the existing prompt render.
 
 ## Update 2026-07-11 — Step 3 committed, needs browser verification
+*(browser verification completed later this day — see the update above)*
 
 The logo/evidence-upload slice (guide §11 task 4) is now committed:
 

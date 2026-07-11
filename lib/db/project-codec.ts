@@ -1,12 +1,14 @@
 import { z } from "zod";
 import {
   asAssetId,
+  asCandidateId,
   asDocumentId,
   asHistoryEventId,
   asProjectId,
   ASSET_SOURCES,
   PRICE_LEVELS,
   readinessScore,
+  REGENERATION_SCOPES,
   STAGE_KINDS,
   type Project,
   type Workflow,
@@ -100,6 +102,65 @@ const stageRun = z.object({
     .optional(),
 });
 
+const genesisAssetInput = z.object({
+  label: z.string(),
+  kind: z.enum(["logo", "image", "document", "reference", "other"]),
+  source: z.enum(ASSET_SOURCES),
+  uri: z.string(),
+  mimeType: z.string().optional(),
+  checksum: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  fileName: z.string().optional(),
+});
+
+const genesisInput = z.object({
+  businessName: z.string(),
+  businessType: z.string(),
+  market: z.string(),
+  country: z.string(),
+  audience: z.string(),
+  priceLevel: z.enum(PRICE_LEVELS),
+  notes: z.string(),
+  assets: z.array(genesisAssetInput),
+});
+
+const claudeDesignPrompt = z.object({
+  prompt: z.string(),
+  constraints: z.array(z.string()),
+  references: z.array(z.string()),
+});
+
+const candidate = z.object({
+  id: z.string().transform(asCandidateId),
+  approach: z.enum(["thin-baseline", "evidence-enriched"]),
+  summary: z.string(),
+  designPrompt: claudeDesignPrompt,
+  inputs: z.object({
+    brief: genesisInput,
+    // Discovery snapshots reuse the stage-result codec; output stays opaque.
+    discovery: stageResult.optional(),
+    promptId: z.string().optional(),
+    promptVersion: z.string().optional(),
+    promptHash: z.string().optional(),
+    backend: z.string(),
+    model: z.string().optional(),
+  }),
+  regeneration: z
+    .object({
+      parentId: z.string().transform(asCandidateId),
+      scope: z.enum(REGENERATION_SCOPES),
+      instruction: z.string().optional(),
+    })
+    .optional(),
+  createdAt: date,
+});
+
+/** Rows written before candidates existed have none; default them. */
+const candidates = z
+  .array(candidate)
+  .nullish()
+  .transform((value) => value ?? []);
+
 const historyEvent = z.discriminatedUnion("type", [
   z.object({
     id: z.string().transform(asHistoryEventId),
@@ -126,6 +187,14 @@ const historyEvent = z.discriminatedUnion("type", [
     type: z.literal("document.added"),
     documentId: z.string(),
     title: z.string(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("candidate.added"),
+    candidateId: z.string(),
+    approach: z.string(),
+    scope: z.string().optional(),
     at: date,
   }),
 ]);
@@ -207,6 +276,7 @@ export const toProjectRow = (project: Project): NewProjectRow => ({
   knowledge: project.knowledge,
   workflowResults: project.workflow.results,
   workflowRuns: project.workflow.runs,
+  candidates: project.candidates,
   documents: project.documents,
   assets: project.assets,
   history: project.history,
@@ -243,6 +313,7 @@ export const toProject = (row: ProjectRow): Project => {
     discovery: discovery.parse(row.discovery),
     knowledge: knowledge.parse(row.knowledge),
     workflow,
+    candidates: candidates.parse(row.candidates) as Project["candidates"],
     documents: document.array().parse(row.documents),
     assets: asset.array().parse(row.assets),
     history: historyEvent.array().parse(row.history),

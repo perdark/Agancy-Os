@@ -1,3 +1,4 @@
+import type { Candidate } from "../genesis/candidate";
 import type { Clock } from "../shared/clock";
 import { asHistoryEventId, asProjectId, type ProjectId } from "../shared/id";
 import type { IdGenerator } from "../shared/id";
@@ -26,6 +27,8 @@ export interface Project {
   readonly discovery: Discovery;
   readonly knowledge: Knowledge;
   readonly workflow: Workflow;
+  /** Stored prototype directions, each with the exact inputs that made it. */
+  readonly candidates: readonly Candidate[];
   readonly documents: readonly Document[];
   readonly assets: readonly Asset[];
   readonly history: readonly HistoryEvent[];
@@ -51,6 +54,7 @@ export const createProject = (
     discovery: emptyDiscovery(),
     knowledge: emptyKnowledge(),
     workflow: initialWorkflow(),
+    candidates: [],
     documents: [],
     assets: [],
     history: [
@@ -74,4 +78,14 @@ export const withHistory = (
   ...project,
   history: [...project.history, event],
   updatedAt: event.at,
+});
+
+/** Append a candidate and bump `updatedAt`, returning a new Project. */
+export const withCandidate = (
+  project: Project,
+  candidate: Candidate,
+): Project => ({
+  ...project,
+  candidates: [...project.candidates, candidate],
+  updatedAt: candidate.createdAt,
 });

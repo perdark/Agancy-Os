@@ -230,27 +230,49 @@ real Postgres engine.
 
 ### Step 3: Build the minimal evidence intake
 
-- Replace the six-field-first experience with:
+**Status: Intake and asset storage DONE — 2026-07-11** (browser-verified:
+upload → previews → stored bytes under `.data/` → served back through the
+asset route). Evidence fact-extraction with citations remains open.
+
+- [x] Replace the six-field-first experience with:
   - Business name or profile.
   - Logo upload and preview.
   - Instagram URL plus screenshot/file upload.
   - One free-form context field.
-- Keep structured business fields as optional refinement.
-- Store real asset bytes through an asset-storage port.
-- Preserve asset kind, MIME type, checksum, source, and display preview.
-- Extract source facts with citations back to the uploaded evidence.
-- Mark every derived statement as `verified`, `operator-provided`, or
+- [x] Keep structured business fields as optional refinement.
+- [x] Store real asset bytes through an asset-storage port.
+- [x] Preserve asset kind, MIME type, checksum, source, and display preview.
+- [ ] Extract source facts with citations back to the uploaded evidence.
+- [ ] Mark every derived statement as `verified`, `operator-provided`, or
   `hypothesis`.
 
 ### Step 4: Generate candidate directions
 
-- Generate at least the thin baseline and one evidence-enriched candidate.
-- Keep locale, direction, dialect, device, buyer, and commerce rules conditional
-  on the prospect rather than globally hard-coded.
-- Do not manufacture missing business facts to make a mockup look complete.
-- Store every candidate and the exact inputs that created it.
-- Make regeneration scoped: entire candidate, one screen, copy, layout, or a
-  corrected assumption.
+**Status: DONE — 2026-07-11.** Verified with 179 passing tests (prospect-rule
+derivation, thin-baseline template, amendment serialization, runner candidate
+recording, regeneration paths, PGlite round-trips of stored candidates),
+TypeScript, lint, production build, and a full browser run: intake →
+thin-baseline + evidence-enriched candidates stored with provenance → scoped
+"one screen" regeneration produced a paste-ready amendment → "entire"
+regeneration re-ran Prototype (attempts 2) and appended a new full candidate.
+Desktop and mobile inspected; no overflow.
+
+- [x] Generate at least the thin baseline and one evidence-enriched candidate.
+  The thin baseline is a deterministic versioned template (the Khatuna
+  control — no AI shapes it), recorded even when generation fails.
+- [x] Keep locale, direction, dialect, device, buyer, and commerce rules
+  conditional on the prospect rather than globally hard-coded
+  (`packages/domain/genesis/prospect-rules.ts`; each active rule names the
+  trigger in the brief that switched it on).
+- [x] Do not manufacture missing business facts to make a mockup look complete
+  (truthfulness rule leads the universal floor and both prompt templates).
+- [x] Store every candidate and the exact inputs that created it (brief
+  snapshot, Discovery snapshot, prompt id/version/SHA-256, backend, model).
+- [x] Make regeneration scoped: entire candidate, one screen, copy, layout, or
+  a corrected assumption. Scoped regeneration emits a deterministic
+  Claude Design amendment; entire regeneration re-runs generation with the
+  operator's correction as overriding truth. Every regeneration is a new
+  candidate linked to its parent.
 
 ### Step 5: Close the Claude Design handoff
 
@@ -392,7 +414,8 @@ Execute these in order:
    *Framework done; blocked on the owner supplying the original materials.*
 3. ~~Add durable draft/run persistence with resumable stage execution.~~
    **Done 2026-07-10.**
-4. Implement real logo and evidence upload with previews and source metadata.
+4. ~~Implement real logo and evidence upload with previews and source
+   metadata.~~ **Done 2026-07-11 (browser-verified).**
 5. Add artifact import and make the mockup the first content on the project
    screen.
 

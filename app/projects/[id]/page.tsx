@@ -9,6 +9,8 @@ import { getProject } from "@/features/projects/service";
 import { EvidenceCard } from "@/features/projects/components/evidence-card";
 import { WorkflowTimeline } from "@/features/projects/components/workflow-timeline";
 import { StageContractView } from "@/features/projects/components/stage-contract-view";
+import { CandidatesCard } from "@/features/genesis/components/candidates-card";
+import { toCandidateView } from "@/features/genesis/candidate-view";
 import { GenerationStatus } from "@/features/genesis/components/generation-status";
 import { GenesisOutputView } from "@/features/genesis/components/genesis-output-view";
 import { PrototypeOutputView } from "@/features/genesis/components/prototype-output-view";
@@ -59,6 +61,18 @@ export default async function ProjectDetailPage({
         <WorkflowTimeline workflow={project.workflow} />
         <GenerationStatus projectId={project.id} workflow={project.workflow} />
       </section>
+
+      {project.candidates.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Candidates
+          </h2>
+          <CandidatesCard
+            projectId={project.id}
+            candidates={project.candidates.map(toCandidateView)}
+          />
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

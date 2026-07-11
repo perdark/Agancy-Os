@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRICE_LEVELS, type GenesisInput } from "@/domain";
+import { PRICE_LEVELS, REGENERATION_SCOPES, type GenesisInput } from "@/domain";
 
 /**
  * Intake limits live beside the edge schema so every caller applies the same
@@ -187,6 +187,36 @@ export const genesisInputSchema = z.object({
 });
 
 export type GenesisFormValues = z.input<typeof genesisInputSchema>;
+
+export const REGENERATION_INSTRUCTION_LIMIT = 600;
+
+/**
+ * Edge validation for candidate regeneration. Scoped regeneration must say
+ * what to change; `entire` may run without an instruction (a fresh attempt).
+ */
+export const regenerateCandidateSchema = z
+  .object({
+    projectId: requiredText("Project id", 64),
+    candidateId: requiredText("Candidate id", 64),
+    scope: z.enum(REGENERATION_SCOPES),
+    instruction: boundedText(
+      "Instruction",
+      REGENERATION_INSTRUCTION_LIMIT,
+    ).default(""),
+  })
+  .superRefine((value, context) => {
+    if (value.scope !== "entire" && value.instruction.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["instruction"],
+        message: "Say what should change for a scoped regeneration",
+      });
+    }
+  });
+
+export type RegenerateCandidateValues = z.input<
+  typeof regenerateCandidateSchema
+>;
 
 /**
  * Compile-time guard: the schema's parsed output must remain assignable to the

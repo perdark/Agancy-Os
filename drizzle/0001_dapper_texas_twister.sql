@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "candidates" jsonb DEFAULT '[]'::jsonb NOT NULL;

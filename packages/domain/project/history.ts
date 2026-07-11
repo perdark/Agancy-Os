@@ -13,7 +13,8 @@ export type HistoryEvent =
   | ProjectCreatedEvent
   | StageRunEvent
   | StageAdvancedEvent
-  | DocumentAddedEvent;
+  | DocumentAddedEvent
+  | CandidateAddedEvent;
 
 interface HistoryEventBase {
   readonly id: HistoryEventId;
@@ -41,6 +42,14 @@ export interface DocumentAddedEvent extends HistoryEventBase {
   readonly type: "document.added";
   readonly documentId: string;
   readonly title: string;
+}
+
+export interface CandidateAddedEvent extends HistoryEventBase {
+  readonly type: "candidate.added";
+  readonly candidateId: string;
+  readonly approach: string;
+  /** Set when the candidate came from a scoped regeneration. */
+  readonly scope?: string;
 }
 
 export type HistoryEventType = HistoryEvent["type"];

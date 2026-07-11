@@ -1,5 +1,7 @@
 import {
+  deriveProspectRules,
   PRICE_LEVEL_LABELS,
+  UNIVERSAL_FLOOR,
   type DiscoveryOutput,
   type GenesisAssetInput,
   type GenesisInput,
@@ -11,27 +13,9 @@ import { definePrompt } from "../types";
 export interface PrototypePromptVariables {
   readonly input: GenesisInput;
   readonly discovery: StageResult<DiscoveryOutput>;
+  /** Operator corrections (regeneration) — treated as truth, never debated. */
+  readonly directives?: readonly string[];
 }
-
-/**
- * The owner's non-negotiables — a FLOOR against generic AI output, not a
- * ceiling on Claude Design's aesthetics. Deliberately short: the design
- * doctrine's judging physics (OKLCH ramps, spacing scales, blur tests)
- * belongs to the build/judge phases, not to this prompt's payload.
- * Versioned with the template.
- */
-export const HARD_FLOOR: readonly string[] = [
-  "Arabic-first RTL layout; use CSS logical properties throughout.",
-  "Arabic body text line-height 1.7-1.9; Arabic headings 1.3-1.4.",
-  "letter-spacing 0 on ALL Arabic text; emphasis via weight, size, or space around — never tracking.",
-  "Latin brand names stay Latin — never transliterated.",
-  "One digit system (default Latin digits); prices use tabular numerals.",
-  'Phone numbers and codes render LTR (dir="ltr" or <bdi>).',
-  "Mobile-first for low-end Android on slow networks.",
-  "Real content only: believable local prices, named variants — zero lorem ipsum, zero placeholders, zero round marketing numbers.",
-  "Copy in the buyer's own voice and dialect, about HER result; at least one visible local trust anchor (cash on delivery, delivery area, guarantee) where fears exist.",
-  "Exactly ONE accent color, spent on the primary action.",
-];
 
 /**
  * The two mandated opening sentences (from the owner's design doctrine).
@@ -47,15 +31,6 @@ export const MANDATED_OPENING =
   "— redesign it from the brief.";
 
 /**
- * The Prototype prompt template — the first-meeting kit generator.
- *
- * World-first by construction: the model must hypothesize the client's world
- * (buyer, scene, fears → visible answers) before any visual direction, then
- * end in one paste-ready Claude Design prompt. The owner's taste enters as a
- * short hard floor, not a doctrine wall — the thin prompt + world + logo is
- * what closed the Khatuna deal.
- */
-/**
  * One ATTACHED ASSETS line per asset. An uploaded file is described by name —
  * its internal `asset://` pointer means nothing outside Agency OS — while a
  * pasted link keeps its URL as citable evidence.
@@ -67,12 +42,25 @@ const describeAsset = (asset: GenesisAssetInput): string =>
       }; the operator attaches it in Claude Design)`
     : `- ${asset.label} (link: ${asset.uri})`;
 
+/**
+ * The Prototype prompt template — the first-meeting kit generator.
+ *
+ * World-first by construction: the model must hypothesize the client's world
+ * (buyer, scene, fears → visible answers) before any visual direction, then
+ * end in one paste-ready Claude Design prompt.
+ *
+ * v0.2.0: the owner's floor is no longer a global wall. The universal craft
+ * rules (truthfulness first) always apply; locale, direction, device, and
+ * commerce rules are derived per prospect by {@link deriveProspectRules} and
+ * each arrives with the trigger in THIS brief that activated it. Operator
+ * directives (regeneration corrections) enter as overriding truth.
+ */
 export const prototypePrompt = definePrompt<PrototypePromptVariables>({
   id: "prototype.first-meeting-kit",
-  version: "0.1.1",
+  version: "0.2.0",
   description:
-    "Turn the brief and Discovery's decode into the first-meeting kit: brand assumptions, positioning, prototype direction with world facts, and a ready-to-paste Claude Design prompt.",
-  render: ({ input, discovery }) => {
+    "Turn the brief and Discovery's decode into the first-meeting kit: brand assumptions, positioning, prototype direction with world facts, and a ready-to-paste Claude Design prompt. Floor rules are prospect-conditional.",
+  render: ({ input, discovery, directives = [] }) => {
     const signals = discovery.output.decodedSignals.map(
       (s) => `  - "${s.clientSaid}" likely means: ${s.likelyMeans} (${s.confidence})`,
     );
@@ -86,6 +74,15 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
         : [
             "- (none attached — the operator will attach the client's logo in Claude Design)",
           ];
+    const corrections = directives
+      .map((directive) => directive.trim())
+      .filter(Boolean);
+    const floor = [
+      ...UNIVERSAL_FLOOR.map((rule) => `    - ${rule}`),
+      ...deriveProspectRules(input).map(
+        (entry) => `    - ${entry.rule} (applies because ${entry.because})`,
+      ),
+    ];
 
     return [
       "You are a senior strategist and design director at a premium digital",
@@ -100,6 +97,10 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
       "and the visible answers to them), then the job she is hiring the",
       "product to do, and only then the screens. A generically pretty design",
       "that could belong to any business is a failure.",
+      "Never manufacture missing business facts: exact prices, opening hours,",
+      "address, menu items, discounts, or customer claims that the brief and",
+      "evidence do not contain stay out of the kit — name them as gaps",
+      "instead of papering over them.",
       "BRIEF",
       `- Business name: ${input.businessName}`,
       `- Business type: ${input.businessType}`,
@@ -115,6 +116,13 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
         ? ["- Standing assumptions:", ...assumptions]
         : []),
       ...(missing.length > 0 ? ["- Known gaps:", ...missing] : []),
+      ...(corrections.length > 0
+        ? [
+            "OPERATOR CORRECTIONS (provided truth — override any conflicting",
+            "assumption above without debate):",
+            ...corrections.map((correction) => `  - ${correction}`),
+          ]
+        : []),
       "ATTACHED ASSETS",
       ...assets,
       "Produce:",
@@ -135,9 +143,10 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
       ...MANDATED_OPENING.split("\n").map((line) => `    ${line}`),
       "    Then describe the product screen by screen, grounded in the world",
       "    facts, positioning, and assumptions above.",
-      "  * constraints: include every rule below (the owner's floor), plus",
-      "    any client-specific constraints you derive:",
-      ...HARD_FLOOR.map((rule) => `    - ${rule}`),
+      "  * constraints: include every rule below (each conditional rule names",
+      "    the trigger in this brief that activated it), plus any",
+      "    client-specific constraints you derive:",
+      ...floor,
       "  * references: the attached asset labels, plus a final instruction",
       "    to the operator to attach the logo file in Claude Design before",
       "    running the prompt.",

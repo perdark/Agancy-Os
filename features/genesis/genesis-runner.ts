@@ -1,14 +1,22 @@
 import {
+  AMENDMENT_FORMAT_ID,
+  AMENDMENT_FORMAT_VERSION,
   asAssetId,
+  asCandidateId,
   asHistoryEventId,
+  buildScopedAmendment,
   completeStageRun,
   createProject,
   failStageRun,
   needsStageRun,
   queueStageRun,
   recordStageResult,
+  REGENERATION_SCOPE_LABELS,
   startStageRun,
+  withCandidate,
   withHistory,
+  type Candidate,
+  type CandidateRegeneration,
   type Clock,
   type DiscoveryGenerator,
   type DiscoveryOutput,
@@ -17,14 +25,17 @@ import {
   type IdGenerator,
   type Project,
   type ProjectId,
+  type PrototypeGenerationOptions,
   type ProjectRepository,
   type PrototypeGenerator,
   type PrototypeOutput,
+  type RegenerationScope,
   type StageContext,
   type StageKind,
   type StageResult,
   type StageRunDiagnostics,
 } from "@/domain";
+import { thinBaselinePrompt } from "@/prompts";
 
 /**
  * The resumable Genesis orchestration, pure of framework imports so it is
@@ -45,6 +56,8 @@ export interface GenesisRunnerDeps {
   readonly clock: Clock;
   /** Which AI transport is bound; recorded in every run's diagnostics. */
   readonly aiBackend: string;
+  /** SHA-256 of a rendered prompt; injected so the runner stays pure. */
+  readonly hashText: (text: string) => string;
 }
 
 export interface GenesisRunOutcome {
@@ -69,6 +82,14 @@ export class GenesisResumeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GenesisResumeError";
+  }
+}
+
+/** A regeneration request that cannot be honoured (bad target or scope). */
+export class GenesisRegenerationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GenesisRegenerationError";
   }
 }
 
@@ -162,7 +183,9 @@ const executeGenesisStages = async (
   input: GenesisInput,
   deps: GenesisRunnerDeps,
 ): Promise<GenesisRunOutcome> => {
-  let project = initial;
+  // The thin baseline needs no AI: record it before the stages so a failed
+  // generation still leaves the operator the Khatuna-style control package.
+  let project = await ensureThinBaselineCandidate(initial, input, deps);
 
   let discoveryResult = project.workflow.results.discovery as
     | StageResult<DiscoveryOutput>
@@ -179,6 +202,7 @@ const executeGenesisStages = async (
   let prototypeResult = project.workflow.results.prototype as
     | StageResult<PrototypeOutput>
     | undefined;
+  let prototypeRan = false;
   if (needsStageRun(project.workflow, "prototype") || !prototypeResult) {
     const savedDiscovery = discoveryResult;
     ({ project, result: prototypeResult } = await runPersistedStage(
@@ -188,9 +212,122 @@ const executeGenesisStages = async (
       (context) =>
         deps.prototypeGenerator.generate(input, savedDiscovery, context),
     ));
+    prototypeRan = true;
+  }
+
+  // Every generated direction is stored as a candidate with its exact inputs
+  // (guide Step 4). A run that regenerated Prototype appends a new candidate;
+  // a project persisted before candidates existed is backfilled once.
+  const hasEnriched = project.candidates.some(
+    (candidate) => candidate.approach === "evidence-enriched",
+  );
+  if (prototypeRan || !hasEnriched) {
+    project = await saveCandidate(
+      project,
+      buildEnrichedCandidate(project, input, discoveryResult, prototypeResult, deps),
+      deps,
+    );
   }
 
   return { project, discoveryResult, prototypeResult };
+};
+
+/** Asset labels double as the package's reference list for thin candidates. */
+const assetLabels = (input: GenesisInput): readonly string[] =>
+  input.assets.map((asset) => asset.label);
+
+const buildThinBaselineCandidate = (
+  input: GenesisInput,
+  deps: GenesisRunnerDeps,
+  regeneration?: CandidateRegeneration,
+): Candidate => {
+  const rendered = thinBaselinePrompt.render({
+    input,
+    directives: regeneration?.instruction ? [regeneration.instruction] : [],
+  });
+  return {
+    id: asCandidateId(deps.ids.next()),
+    approach: "thin-baseline",
+    summary:
+      "Thin baseline — the operator's facts, the logo, and model judgment (the Khatuna control).",
+    designPrompt: {
+      prompt: rendered,
+      constraints: [],
+      references: [
+        ...assetLabels(input),
+        "Attach the client's logo file in Claude Design before running the prompt.",
+      ],
+    },
+    inputs: {
+      brief: input,
+      promptId: thinBaselinePrompt.id,
+      promptVersion: thinBaselinePrompt.version,
+      promptHash: deps.hashText(rendered),
+      backend: "template",
+    },
+    ...(regeneration ? { regeneration } : {}),
+    createdAt: deps.clock.now(),
+  };
+};
+
+const buildEnrichedCandidate = (
+  project: Project,
+  input: GenesisInput,
+  discovery: StageResult<DiscoveryOutput>,
+  prototype: StageResult<PrototypeOutput>,
+  deps: GenesisRunnerDeps,
+  regeneration?: CandidateRegeneration,
+): Candidate => {
+  // The run's diagnostics hold what actually produced this result — the
+  // versioned prompt identity and the model the transport reported.
+  const diagnostics = project.workflow.runs.prototype?.diagnostics;
+  return {
+    id: asCandidateId(deps.ids.next()),
+    approach: "evidence-enriched",
+    summary: prototype.output.prototypeDirection.concept,
+    designPrompt: prototype.output.designPrompt,
+    inputs: {
+      brief: input,
+      discovery,
+      promptId: diagnostics?.promptId,
+      promptVersion: diagnostics?.promptVersion,
+      promptHash: diagnostics?.promptHash,
+      backend: diagnostics?.backend ?? deps.aiBackend,
+      model: diagnostics?.model,
+    },
+    ...(regeneration ? { regeneration } : {}),
+    createdAt: deps.clock.now(),
+  };
+};
+
+const ensureThinBaselineCandidate = async (
+  project: Project,
+  input: GenesisInput,
+  deps: GenesisRunnerDeps,
+): Promise<Project> => {
+  const hasThin = project.candidates.some(
+    (candidate) => candidate.approach === "thin-baseline",
+  );
+  if (hasThin) return project;
+  return saveCandidate(project, buildThinBaselineCandidate(input, deps), deps);
+};
+
+/** Append a candidate + its history event and persist the aggregate. */
+const saveCandidate = async (
+  project: Project,
+  candidate: Candidate,
+  deps: GenesisRunnerDeps,
+): Promise<Project> => {
+  const updated = withHistory(withCandidate(project, candidate), {
+    id: asHistoryEventId(deps.ids.next()),
+    type: "candidate.added",
+    candidateId: candidate.id,
+    approach: candidate.approach,
+    ...(candidate.regeneration ? { scope: candidate.regeneration.scope } : {}),
+    at: candidate.createdAt,
+  });
+  await deps.projects.save(updated);
+  return updated;
 };
 
 /**
@@ -270,3 +407,146 @@ const mergeDiagnostics = (
  */
 const describeFailure = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
+
+export interface RegenerateCandidateRequest {
+  readonly projectId: ProjectId;
+  readonly candidateId: string;
+  readonly scope: RegenerationScope;
+  /** Required for scoped regeneration; optional steering for `entire`. */
+  readonly instruction?: string;
+}
+
+export interface CandidateRegenerationOutcome {
+  readonly project: Project;
+  readonly candidate: Candidate;
+}
+
+const truncate = (text: string, max: number): string =>
+  text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+
+/**
+ * Regenerate at operator-chosen scope (guide Step 4). Every path produces a
+ * NEW candidate recorded with its exact inputs and its parent — regeneration
+ * never rewrites what was already generated.
+ *
+ *  - `entire` on the thin baseline re-renders the template with the
+ *    correction folded in as operator truth (still no AI in the control).
+ *  - `entire` on an evidence-enriched candidate re-runs the Prototype stage
+ *    through the full persisted run lifecycle, steered by the correction.
+ *  - `screen`/`copy`/`layout`/`assumption` build a deterministic paste-ready
+ *    amendment for the same Claude Design session as the parent package.
+ */
+export const regenerateCandidateRun = async (
+  request: RegenerateCandidateRequest,
+  deps: GenesisRunnerDeps,
+): Promise<CandidateRegenerationOutcome> => {
+  const project = await deps.projects.findById(request.projectId);
+  if (!project) {
+    throw new GenesisRegenerationError(
+      `Project ${request.projectId} was not found.`,
+    );
+  }
+  const parent = project.candidates.find(
+    (candidate) => candidate.id === request.candidateId,
+  );
+  if (!parent) {
+    throw new GenesisRegenerationError(
+      `Candidate ${request.candidateId} was not found on project ${project.id}.`,
+    );
+  }
+
+  const instruction = request.instruction?.trim() || undefined;
+  const regeneration: CandidateRegeneration = {
+    parentId: parent.id,
+    scope: request.scope,
+    ...(instruction ? { instruction } : {}),
+  };
+
+  if (request.scope !== "entire") {
+    if (!instruction) {
+      throw new GenesisRegenerationError(
+        "A scoped regeneration needs an instruction saying what to change.",
+      );
+    }
+    const amendment = buildScopedAmendment({
+      parent,
+      scope: request.scope,
+      instruction,
+    });
+    const candidate: Candidate = {
+      id: asCandidateId(deps.ids.next()),
+      approach: parent.approach,
+      summary: truncate(
+        `${REGENERATION_SCOPE_LABELS[request.scope]}: ${instruction}`,
+        160,
+      ),
+      designPrompt: { prompt: amendment, constraints: [], references: [] },
+      inputs: {
+        brief: parent.inputs.brief,
+        promptId: AMENDMENT_FORMAT_ID,
+        promptVersion: AMENDMENT_FORMAT_VERSION,
+        promptHash: deps.hashText(amendment),
+        backend: "template",
+      },
+      regeneration,
+      createdAt: deps.clock.now(),
+    };
+    const updated = await saveCandidate(project, candidate, deps);
+    return { project: updated, candidate };
+  }
+
+  if (parent.approach === "thin-baseline") {
+    const candidate = buildThinBaselineCandidate(
+      parent.inputs.brief,
+      deps,
+      regeneration,
+    );
+    const updated = await saveCandidate(project, candidate, deps);
+    return { project: updated, candidate };
+  }
+
+  // Entire evidence-enriched regeneration: a fresh Prototype run through the
+  // full persisted stage lifecycle, from the SAME Discovery snapshot that fed
+  // the parent, steered by the operator's correction when one was given.
+  const discovery =
+    parent.inputs.discovery ??
+    (project.workflow.results.discovery as
+      | StageResult<DiscoveryOutput>
+      | undefined);
+  if (!discovery) {
+    throw new GenesisRegenerationError(
+      "This candidate has no saved Discovery result to regenerate from.",
+    );
+  }
+
+  const options: PrototypeGenerationOptions | undefined = instruction
+    ? { directives: [instruction] }
+    : undefined;
+  const queued: Project = {
+    ...project,
+    workflow: queueStageRun(project.workflow, "prototype", deps.clock.now()),
+  };
+  await deps.projects.save(queued);
+  const { project: afterRun, result } = await runPersistedStage(
+    queued,
+    "prototype",
+    deps,
+    (context) =>
+      deps.prototypeGenerator.generate(
+        parent.inputs.brief,
+        discovery,
+        context,
+        options,
+      ),
+  );
+  const candidate = buildEnrichedCandidate(
+    afterRun,
+    parent.inputs.brief,
+    discovery,
+    result,
+    deps,
+    regeneration,
+  );
+  const updated = await saveCandidate(afterRun, candidate, deps);
+  return { project: updated, candidate };
+};
