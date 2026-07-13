@@ -230,38 +230,83 @@ real Postgres engine.
 
 ### Step 3: Build the minimal evidence intake
 
-- Replace the six-field-first experience with:
+**Status: Intake and asset storage DONE — 2026-07-11** (browser-verified:
+upload → previews → stored bytes under `.data/` → served back through the
+asset route). Evidence fact-extraction with citations remains open.
+
+- [x] Replace the six-field-first experience with:
   - Business name or profile.
   - Logo upload and preview.
   - Instagram URL plus screenshot/file upload.
   - One free-form context field.
-- Keep structured business fields as optional refinement.
-- Store real asset bytes through an asset-storage port.
-- Preserve asset kind, MIME type, checksum, source, and display preview.
-- Extract source facts with citations back to the uploaded evidence.
-- Mark every derived statement as `verified`, `operator-provided`, or
+- [x] Keep structured business fields as optional refinement.
+- [x] Store real asset bytes through an asset-storage port.
+- [x] Preserve asset kind, MIME type, checksum, source, and display preview.
+- [ ] Extract source facts with citations back to the uploaded evidence.
+- [ ] Mark every derived statement as `verified`, `operator-provided`, or
   `hypothesis`.
 
 ### Step 4: Generate candidate directions
 
-- Generate at least the thin baseline and one evidence-enriched candidate.
-- Keep locale, direction, dialect, device, buyer, and commerce rules conditional
-  on the prospect rather than globally hard-coded.
-- Do not manufacture missing business facts to make a mockup look complete.
-- Store every candidate and the exact inputs that created it.
-- Make regeneration scoped: entire candidate, one screen, copy, layout, or a
-  corrected assumption.
+**Status: DONE — 2026-07-11.** Verified with 179 passing tests (prospect-rule
+derivation, thin-baseline template, amendment serialization, runner candidate
+recording, regeneration paths, PGlite round-trips of stored candidates),
+TypeScript, lint, production build, and a full browser run: intake →
+thin-baseline + evidence-enriched candidates stored with provenance → scoped
+"one screen" regeneration produced a paste-ready amendment → "entire"
+regeneration re-ran Prototype (attempts 2) and appended a new full candidate.
+Desktop and mobile inspected; no overflow.
+
+- [x] Generate at least the thin baseline and one evidence-enriched candidate.
+  The thin baseline is a deterministic versioned template (the Khatuna
+  control — no AI shapes it), recorded even when generation fails.
+- [x] Keep locale, direction, dialect, device, buyer, and commerce rules
+  conditional on the prospect rather than globally hard-coded
+  (`packages/domain/genesis/prospect-rules.ts`; each active rule names the
+  trigger in the brief that switched it on).
+- [x] Do not manufacture missing business facts to make a mockup look complete
+  (truthfulness rule leads the universal floor and both prompt templates).
+- [x] Store every candidate and the exact inputs that created it (brief
+  snapshot, Discovery snapshot, prompt id/version/SHA-256, backend, model).
+- [x] Make regeneration scoped: entire candidate, one screen, copy, layout, or
+  a corrected assumption. Scoped regeneration emits a deterministic
+  Claude Design amendment; entire regeneration re-runs generation with the
+  operator's correction as overriding truth. Every regeneration is a new
+  candidate linked to its parent.
 
 ### Step 5: Close the Claude Design handoff
 
-- Present one dominant "Open in Claude Design" or "Copy complete package"
-  action.
-- Verify that all required assets are attached before generation.
-- Provide a clear return step for importing screenshots or a result URL.
-- Store the returned artifact beside its prompt, assets, and model metadata.
-- Never label the project "meeting ready" while only a prompt exists.
+**Status: DONE — 2026-07-11.** Verified with 190 passing tests (meeting
+readiness derivation, artifact import use-case, PGlite round-trips of
+artifacts and mockup assets), TypeScript, lint, and production build.
+Browser verification deliberately deferred at the owner's request — run it
+together with the Lotus Cafe acceptance test.
+
+- [x] Present one dominant "Copy complete package" action (the handoff card
+  leads the project screen with the selected candidate's package).
+- [x] Verify that all required assets are attached before generation (the
+  handoff card lists every uploaded attachment and warns loudly when no
+  logo exists).
+- [x] Provide a clear return step for importing screenshots or a result URL.
+- [x] Store the returned artifact beside its prompt, assets, and model
+  metadata (`MockupArtifact` links to the candidate whose package produced
+  it; the candidate already pins prompt, inputs, and model).
+- [x] Never label the project "meeting ready" while only a prompt exists
+  (`assessMeetingReadiness` is a pure domain function; prompt-only projects
+  are structurally unable to read as ready).
 
 ### Step 6: Add an artifact quality gate
+
+**Status: DONE — 2026-07-11** (built; not yet exercised in a browser or on a
+real prospect — the owner will test). The gate combines pure structural
+checks over the aggregate with an independent vision judge
+(`ArtifactJudge` port; API transport sends the actual screenshot bytes,
+cli/placeholder bind a null judge and the verdict honestly records
+structural-only, capped at "warning"). Every violation carries a readiness
+cap and the final readiness is min(AI score, all caps), so a deterministic
+failure caps readiness regardless of the AI score. The verdict is stored on
+the artifact and drives meeting readiness: unevaluated or gate-failed
+mockups block; warnings surface as cautions.
 
 Evaluate the actual desktop and mobile screenshots for:
 
@@ -280,6 +325,13 @@ blank screens, or a prompt that omits required package sections.
 
 ### Step 7: Build Meeting Mode
 
+**Status: DONE — 2026-07-11** (built; owner to test in browser).
+`/projects/[id]/meeting` opens directly from the project header once a
+presentable artifact exists. The page renders only a `MeetingBrief` — a
+domain type that structurally cannot carry diagnostics, model names,
+prompt provenance, or stage mechanics (tested by serializing the brief and
+asserting internals are absent).
+
 Meeting Mode should show:
 
 1. The selected mockup immediately.
@@ -293,6 +345,12 @@ The client should not see implementation diagnostics, model errors, stage
 contracts, or internal confidence mechanics.
 
 ### Step 8: Build the learning loop
+
+**Status: DONE — 2026-07-11** (built; owner to test in browser). Meeting
+outcomes are append-only records tied to the presented candidate (and
+artifact when shown): deal won/lost/pending, operator changes, client
+changes, reaction, and why the direction worked — plus the intake→first
+artifact time metric. Recorded through a form on the project screen.
 
 Record:
 
@@ -392,9 +450,10 @@ Execute these in order:
    *Framework done; blocked on the owner supplying the original materials.*
 3. ~~Add durable draft/run persistence with resumable stage execution.~~
    **Done 2026-07-10.**
-4. Implement real logo and evidence upload with previews and source metadata.
-5. Add artifact import and make the mockup the first content on the project
-   screen.
+4. ~~Implement real logo and evidence upload with previews and source
+   metadata.~~ **Done 2026-07-11 (browser-verified).**
+5. ~~Add artifact import and make the mockup the first content on the project
+   screen.~~ **Done 2026-07-11.**
 
 Do not begin another Agency OS stage until these five tasks are complete and the
 Lotus Cafe acceptance test has been run through the full workflow.

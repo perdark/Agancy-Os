@@ -1,3 +1,6 @@
+import type { Candidate } from "../genesis/candidate";
+import type { MockupArtifact } from "./artifacts";
+import type { MeetingOutcome } from "./outcomes";
 import type { Clock } from "../shared/clock";
 import { asHistoryEventId, asProjectId, type ProjectId } from "../shared/id";
 import type { IdGenerator } from "../shared/id";
@@ -26,6 +29,12 @@ export interface Project {
   readonly discovery: Discovery;
   readonly knowledge: Knowledge;
   readonly workflow: Workflow;
+  /** Stored prototype directions, each with the exact inputs that made it. */
+  readonly candidates: readonly Candidate[];
+  /** Rendered mockups imported back from Claude Design (see MockupArtifact). */
+  readonly artifacts: readonly MockupArtifact[];
+  /** What happened in real meetings — the learning loop's records. */
+  readonly outcomes: readonly MeetingOutcome[];
   readonly documents: readonly Document[];
   readonly assets: readonly Asset[];
   readonly history: readonly HistoryEvent[];
@@ -51,6 +60,9 @@ export const createProject = (
     discovery: emptyDiscovery(),
     knowledge: emptyKnowledge(),
     workflow: initialWorkflow(),
+    candidates: [],
+    artifacts: [],
+    outcomes: [],
     documents: [],
     assets: [],
     history: [
@@ -74,4 +86,14 @@ export const withHistory = (
   ...project,
   history: [...project.history, event],
   updatedAt: event.at,
+});
+
+/** Append a candidate and bump `updatedAt`, returning a new Project. */
+export const withCandidate = (
+  project: Project,
+  candidate: Candidate,
+): Project => ({
+  ...project,
+  candidates: [...project.candidates, candidate],
+  updatedAt: candidate.createdAt,
 });

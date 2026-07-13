@@ -20,5 +20,15 @@ export interface PrototypeGenerator {
     input: GenesisInput,
     discovery: StageResult<DiscoveryOutput>,
     context: StageContext,
+    options?: PrototypeGenerationOptions,
   ): Promise<StageResult<PrototypeOutput>>;
+}
+
+/**
+ * Optional steering for a (re-)generation. Directives are operator-provided
+ * truth — corrections recorded verbatim that must override the model's own
+ * assumptions wherever the two conflict.
+ */
+export interface PrototypeGenerationOptions {
+  readonly directives?: readonly string[];
 }

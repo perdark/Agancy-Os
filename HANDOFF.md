@@ -1,9 +1,153 @@
 # HANDOFF — session state
 
 **Date:** 2026-07-11 (Claude/Fable 5; owner continuing from mobile)
-**Branch:** `claude/agency-os-foundation-gr9yso`
+**Branch:** `claude/step-4-project-5d8iqp` (continues from
+`claude/agency-os-foundation-gr9yso`)
+
+## Update 2026-07-11 (final) — Steps 6, 7, 8 built; owner will test
+
+All three remaining core steps are implemented and unit-verified (210 tests
+pass, typecheck, lint, production build). **Nothing in Steps 5–8 has been
+browser-tested or run against a real prospect yet — the owner will test.**
+
+**Step 6 — artifact quality gate.** `ArtifactEvaluation`
+(`packages/domain/project/artifact-evaluation.ts`): structural checks
+(no screenshots / no logo / incomplete package) plus an independent vision
+judge behind the `ArtifactJudge` port. API backend sends real screenshot
+bytes to `claude-sonnet-5` with a versioned judge prompt
+(`artifact-judge.quality-gate@0.1.0`); cli/placeholder bind `NullArtifactJudge`
+and the stored verdict says structural-only. Violations come from a closed
+set, each with a readiness cap; final readiness = min(mean AI score, caps) —
+a fabricated-facts flag caps a 95-scored artifact to 30 (tested). Without a
+vision judge the base is 55, so structural-only never reads better than
+"warning". Verdict stored on the artifact (`evaluation` field, JSONB —
+no migration needed), history event `artifact.evaluated`, "Run quality
+gate" button on the mockup card. Meeting readiness now blocks unevaluated
+and gate-failed mockups; warnings become cautions.
+
+**Step 7 — Meeting Mode.** `buildMeetingBrief`
+(`packages/domain/project/meeting-brief.ts`) returns null until a
+presentable artifact exists; the brief carries only business name, concept
+sentence, screenshots, result URL, ≤5 assumptions, ≤5 client questions — a
+test serializes it and asserts no backend/model/prompt/readiness strings
+leak. `/projects/[id]/meeting` renders it with prev/next screen navigation;
+"Open Meeting Mode" appears in the project header.
+
+**Step 8 — learning loop.** `MeetingOutcome`
+(`packages/domain/project/outcomes.ts`): append-only records tied to the
+presented candidate (+ artifact), deal won/lost/pending, operator/client
+changes, reaction, why-it-worked, `timeToFirstArtifactMs` metric. New
+`outcomes` JSONB column + migration (`drizzle/0003_cuddly_champions.sql`),
+codec, history event `outcome.recorded`, outcomes card + form on the
+project screen.
+
+**What the owner should test in the browser (all of Steps 5–8):**
+intake → copy package → run in Claude Design → import screenshots →
+run the quality gate → check readiness states → open Meeting Mode →
+record an outcome. Then the Lotus Cafe acceptance test end-to-end.
+
+**Known limitations:** the vision judge requires `AGENCY_AI_BACKEND=api`
+with `ANTHROPIC_API_KEY` (the CLI one-shot has no image path — structural-
+only there); desktop-vs-mobile screenshot distinction is not modelled yet
+(the judge sees all screenshots together); Step 0 (benchmark materials) and
+Step 3's evidence fact-extraction remain open.
+
+## Update 2026-07-11 (latest) — Step 5 DONE (browser check deferred)
+
+Guide §7 Step 5 (close the Claude Design handoff) is implemented:
+
+- **`MockupArtifact`** (`packages/domain/project/artifacts.ts`): screenshots
+  and/or a result URL imported back from Claude Design, tied to the
+  CANDIDATE whose package produced it (the candidate already pins prompt,
+  inputs, and model — no duplication). Screenshots are stored through the
+  asset-storage port as assets of new kind `"mockup"` and stream back
+  through the existing asset route.
+- **Meeting readiness** (`packages/domain/project/meeting-readiness.ts`):
+  pure derivation — `no-package` / `prompt-only` / `mockup-imported`. A
+  prompt-only project can never read as ready; a missing logo is a named
+  blocker; an imported mockup is ready with an explicit caution that the
+  Step 6 quality gate does not exist yet.
+- **Mockup-first project screen** (guide §8): Selected mockup → Meeting
+  readiness → the ONE dominant handoff card ("Copy complete package" for
+  the selected candidate + attach-checklist + import form) → workflow →
+  candidates → brief/evidence → stage details. The duplicate package card
+  was removed from the Prototype stage view. Mockup screenshots are
+  excluded from the evidence locker.
+- `importProjectArtifact` server action: multipart (screenshots
+  image-allowlisted, 10MB each / 50MB total / 12 max, URL and note
+  bounded), bytes through the asset-storage port, stable public errors.
+  New `artifacts` JSONB column + migration
+  (`drizzle/0002_flowery_maddog.sql`); legacy rows decode to `[]`.
+
+**Verification performed:** 190 tests pass (11 new), typecheck, lint zero
+warnings, production build. **Browser verification deliberately deferred at
+the owner's request** — the import flow and mockup-first layout have NOT
+been driven in a real browser yet; do that together with the Lotus Cafe
+acceptance test.
+
+**Remaining gap to a meeting-ready artifact:** the Step 6 quality gate
+(evaluate the rendered screenshots; deterministic failures cap readiness).
+Step 3's evidence fact-extraction with citations and Step 0's owner
+materials remain open. §11's five immediate tasks are now complete except
+task 2 (blocked on owner); the Lotus Cafe acceptance test through the full
+workflow — including a real Claude Design run and import — has not been
+executed.
+
+## Update 2026-07-11 (later) — Step 4 DONE, Step 3 browser-verified
+
+Guide §7 Step 4 (candidate directions) is complete:
+
+- Every generation now records **two candidates** on the project: a
+  deterministic **thin-baseline** package (versioned template
+  `thin-baseline.first-meeting@0.1.0` — the Khatuna control, recorded even
+  when AI generation fails) and the **evidence-enriched** package from the
+  Prototype stage. Each candidate stores its exact inputs: brief snapshot,
+  Discovery snapshot, prompt id/version/SHA-256, backend, and actual model
+  (`packages/domain/genesis/candidate.ts`).
+- The prototype prompt is now **v0.2.0**: the global Arabic-RTL/mobile/
+  commerce hard floor was replaced by a universal truthfulness-first floor
+  plus prospect-conditional rules
+  (`packages/domain/genesis/prospect-rules.ts`) — each active rule names the
+  brief trigger that switched it on. A Georgian cafe gets no RTL rules; an
+  Iraqi one does.
+- **Scoped regeneration** (`regenerateCandidateRun` in the genesis runner):
+  `entire` re-runs Prototype through the persisted stage lifecycle with the
+  operator's correction injected as overriding truth (port gained optional
+  `PrototypeGenerationOptions.directives`); `screen`/`copy`/`layout`/
+  `assumption` build a deterministic paste-ready `CLAUDE DESIGN AMENDMENT`
+  for the same Claude Design session. Every regeneration appends a NEW
+  candidate linked to its parent — nothing is overwritten.
+- Candidates render on the project page above the Brief (guide §8 order),
+  newest first, with copy actions, provenance lines, and a per-candidate
+  regenerate form. New `candidates` JSONB column + migration
+  (`drizzle/0001_dapper_texas_twister.sql`); legacy rows decode to `[]` and
+  are backfilled with both candidates on their next resume.
+
+**Verification performed:** 179 tests pass (28 new: prospect rules, thin
+template, amendment bytes, clipboard payloads, runner candidate recording,
+all regeneration paths, PGlite candidate round-trips with Date revival),
+typecheck, lint zero warnings, production build. Browser (placeholder
+backend, dev server): intake with real logo + evidence PNG uploads →
+previews rendered → bytes stored under `.data/assets/` and served 200 via
+the asset route (closes Step 3's open browser check) → both candidates
+listed with provenance → "one screen" regeneration added an amendment
+candidate → "entire" regeneration re-ran Prototype (attempts 2) and added a
+full candidate with the correct copy label. Desktop + mobile screenshots
+inspected; no horizontal overflow. Browser verification found and fixed two
+UI defects: entire-scope regenerations mislabelled "Copy amendment", and the
+regenerate form kept a stale scope when reopened.
+
+**Remaining gap to a meeting-ready artifact:** candidates are still prompt
+packages — no rendered mockup is stored yet. Next in order: guide §11 task 5
+/ §7 Step 5 — artifact import (screenshots or URL) and mockup-first project
+screen; then the Step 6 quality gate. Step 3's evidence fact-extraction with
+citations also remains open. The CLI backend has not re-verified this slice
+(this container has no `claude` CLI); the placeholder run exercised the full
+persistence and UI path, and the CLI transport only changed by passing
+`directives` through the existing prompt render.
 
 ## Update 2026-07-11 — Step 3 committed, needs browser verification
+*(browser verification completed later this day — see the update above)*
 
 The logo/evidence-upload slice (guide §11 task 4) is now committed:
 

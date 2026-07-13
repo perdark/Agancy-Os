@@ -30,6 +30,7 @@ export type AssetKind =
   | "image"
   | "document"
   | "reference"
+  | "mockup"
   | "other";
 
 export const ASSET_SOURCES = ["operator-upload", "operator-link"] as const;

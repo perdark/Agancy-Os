@@ -5,12 +5,16 @@ import {
   type GenesisInput,
   type Project,
   type PrototypeOutput,
+  type RegenerationScope,
   type StageResult,
 } from "@/domain";
+import { hashPrompt } from "@/lib/ai/prompt-hash";
 import { getContainer } from "@/lib/container";
 import {
+  regenerateCandidateRun,
   resumeGenesisRun,
   runGenesisDraftFirst,
+  type CandidateRegenerationOutcome,
   type GenesisRunnerDeps,
 } from "./genesis-runner";
 
@@ -40,6 +44,7 @@ const runnerDeps = (): GenesisRunnerDeps => {
     ids: context.ids,
     clock: context.clock,
     aiBackend,
+    hashText: hashPrompt,
   };
 };
 
@@ -50,3 +55,20 @@ export const runGenesis = async (
 /** Re-run only the stages a saved project still needs (see genesis-runner). */
 export const resumeGenesis = async (projectId: string): Promise<GenesisResult> =>
   resumeGenesisRun(asProjectId(projectId), runnerDeps());
+
+/** Regenerate one candidate at operator-chosen scope (see genesis-runner). */
+export const regenerateCandidate = async (args: {
+  projectId: string;
+  candidateId: string;
+  scope: RegenerationScope;
+  instruction?: string;
+}): Promise<CandidateRegenerationOutcome> =>
+  regenerateCandidateRun(
+    {
+      projectId: asProjectId(args.projectId),
+      candidateId: args.candidateId,
+      scope: args.scope,
+      instruction: args.instruction,
+    },
+    runnerDeps(),
+  );

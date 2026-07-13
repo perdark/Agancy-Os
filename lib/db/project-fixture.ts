@@ -1,10 +1,16 @@
 import {
+  asArtifactId,
   asAssetId,
+  asCandidateId,
   asDocumentId,
   asHistoryEventId,
+  asOutcomeId,
   asProjectId,
   buildStageResult,
+  readinessScore,
   type Clock,
+  type DiscoveryOutput,
+  type GenesisInput,
   type Project,
 } from "@/domain";
 
@@ -20,7 +26,7 @@ export const buildMaximalProject = (): Project => {
     new Date(Date.UTC(2026, 6, 10, 9, 0, offsetSeconds));
   const clock: Clock = { now: () => t(30) };
 
-  const discoveryResult = buildStageResult(
+  const discoveryResult = buildStageResult<DiscoveryOutput>(
     {
       stage: "discovery",
       output: {
@@ -87,6 +93,28 @@ export const buildMaximalProject = (): Project => {
     clock,
   );
 
+  const brief: GenesisInput = {
+    businessName: "Lotus Cafe",
+    businessType: "cafe",
+    market: "food & drink",
+    country: "Iraq",
+    audience: "students",
+    priceLevel: "mid",
+    notes: "near a college",
+    assets: [
+      {
+        label: "Logo",
+        kind: "logo",
+        source: "operator-upload",
+        uri: `asset://${"c".repeat(64)}`,
+        mimeType: "image/png",
+        checksum: "c".repeat(64),
+        sizeBytes: 2_048,
+        fileName: "lotus-logo.png",
+      },
+    ],
+  };
+
   return {
     id: asProjectId("11111111-2222-4333-8444-555555555555"),
     identity: {
@@ -150,6 +178,102 @@ export const buildMaximalProject = (): Project => {
         },
       },
     },
+    candidates: [
+      {
+        id: asCandidateId("cand-1"),
+        approach: "thin-baseline",
+        summary: "Thin baseline — the Khatuna control.",
+        designPrompt: {
+          prompt: "Design a polished mockup for Lotus Cafe…",
+          constraints: [],
+          references: ["Logo"],
+        },
+        inputs: {
+          brief,
+          promptId: "thin-baseline.first-meeting",
+          promptVersion: "0.1.0",
+          promptHash: "d".repeat(64),
+          backend: "template",
+        },
+        createdAt: t(33),
+      },
+      {
+        id: asCandidateId("cand-2"),
+        approach: "evidence-enriched",
+        summary: "Study-friendly cafe companion.",
+        designPrompt: {
+          prompt: "Before designing anything, narrate the student's attempt…",
+          constraints: ["One accent color."],
+          references: ["Logo", "Attach the logo in Claude Design."],
+        },
+        inputs: {
+          brief,
+          discovery: discoveryResult,
+          promptId: "prototype.first-meeting-kit",
+          promptVersion: "0.2.0",
+          promptHash: "e".repeat(64),
+          backend: "cli",
+          model: "claude-sonnet-5",
+        },
+        regeneration: {
+          parentId: asCandidateId("cand-1"),
+          scope: "assumption",
+          instruction: "The audience is college staff, not students.",
+        },
+        createdAt: t(34),
+      },
+    ],
+    artifacts: [
+      {
+        id: asArtifactId("art-1"),
+        candidateId: asCandidateId("cand-2"),
+        screenshotAssetIds: [asAssetId("asset-3")],
+        resultUrl: "https://claude.ai/share/lotus-mockup",
+        note: "Desktop render, first pass.",
+        evaluation: {
+          violations: [
+            {
+              id: "generic-template",
+              label:
+                "The design could belong to any business — generic template signals.",
+              cap: 55,
+              detail: "The hero section is a stock cafe layout.",
+            },
+          ],
+          scores: [
+            {
+              criterion: "brandFidelity",
+              score: 82,
+              note: "Logo colors carried through.",
+            },
+            {
+              criterion: "contentTruth",
+              score: 90,
+              note: "No invented prices.",
+            },
+          ],
+          summary: "Solid but the hero reads generic.",
+          readiness: readinessScore(55),
+          gate: "warning",
+          judge: { backend: "api", model: "claude-sonnet-5" },
+          evaluatedAt: t(36),
+        },
+        importedAt: t(35),
+      },
+    ],
+    outcomes: [
+      {
+        id: asOutcomeId("out-1"),
+        candidateId: asCandidateId("cand-2"),
+        artifactId: asArtifactId("art-1"),
+        operatorChanges: "Swapped the hero image.",
+        clientChanges: "Asked for a loyalty card screen.",
+        reaction: "Impressed by the study-corner framing.",
+        deal: "won",
+        whyItWorked: "The mockup showed their world, not a template.",
+        recordedAt: t(40),
+      },
+    ],
     documents: [
       {
         id: asDocumentId("doc-1"),
@@ -182,6 +306,18 @@ export const buildMaximalProject = (): Project => {
         uri: "https://example.com/shot.png",
         addedAt: t(4),
       },
+      {
+        id: asAssetId("asset-3"),
+        label: "mockup-home.png",
+        kind: "mockup",
+        source: "operator-upload",
+        uri: `asset://${"f".repeat(64)}`,
+        mimeType: "image/png",
+        checksum: "f".repeat(64),
+        sizeBytes: 8_192,
+        fileName: "mockup-home.png",
+        addedAt: t(35),
+      },
     ],
     history: [
       {
@@ -210,6 +346,37 @@ export const buildMaximalProject = (): Project => {
         documentId: "doc-1",
         title: "Strategic brief",
         at: t(32),
+      },
+      {
+        id: asHistoryEventId("h-5"),
+        type: "candidate.added",
+        candidateId: "cand-2",
+        approach: "evidence-enriched",
+        scope: "assumption",
+        at: t(34),
+      },
+      {
+        id: asHistoryEventId("h-6"),
+        type: "artifact.imported",
+        artifactId: "art-1",
+        candidateId: "cand-2",
+        screenshots: 1,
+        at: t(35),
+      },
+      {
+        id: asHistoryEventId("h-7"),
+        type: "artifact.evaluated",
+        artifactId: "art-1",
+        gate: "warning",
+        readiness: 55,
+        at: t(36),
+      },
+      {
+        id: asHistoryEventId("h-8"),
+        type: "outcome.recorded",
+        outcomeId: "out-1",
+        deal: "won",
+        at: t(40),
       },
     ],
     createdAt: t(0),

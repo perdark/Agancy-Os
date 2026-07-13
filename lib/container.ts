@@ -2,6 +2,7 @@ import "server-only";
 import { join } from "node:path";
 import {
   systemClock,
+  type ArtifactJudge,
   type AssetStorage,
   type Clock,
   type DiscoveryGenerator,
@@ -15,6 +16,10 @@ import {
   PlaceholderDiscoveryGenerator,
   PlaceholderPrototypeGenerator,
 } from "@/stages";
+import {
+  ClaudeArtifactJudge,
+  NullArtifactJudge,
+} from "./ai/claude-artifact-judge";
 import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
 import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
@@ -61,6 +66,12 @@ export interface Container {
   readonly assetStorage: AssetStorage;
   /** Which AI transport the generators ride; recorded in run diagnostics. */
   readonly aiBackend: AiBackend;
+  /**
+   * The quality gate's independent vision judge. Only the API transport can
+   * look at screenshots today; cli/placeholder bind the null judge and the
+   * gate stays honest about being structural-only.
+   */
+  readonly artifactJudge: ArtifactJudge;
 }
 
 /**
@@ -114,6 +125,8 @@ export const getContainer = (): Container => {
     stages: buildStageRegistry(),
     assetStorage: new LocalAssetStorage(resolveAssetDir()),
     aiBackend,
+    artifactJudge:
+      aiBackend === "api" ? new ClaudeArtifactJudge() : new NullArtifactJudge(),
   };
 
   return container;
