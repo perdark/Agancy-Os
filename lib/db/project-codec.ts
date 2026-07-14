@@ -1,12 +1,21 @@
 import { z } from "zod";
 import {
+  asArtifactId,
   asAssetId,
+  asCandidateId,
   asDocumentId,
+  asExtractionId,
   asHistoryEventId,
+  asOutcomeId,
   asProjectId,
   ASSET_SOURCES,
+  CRITIQUE_FINDING_CATEGORIES,
+  CRITIQUE_VERDICTS,
+  FACT_CATEGORIES,
+  FACT_PROVENANCES,
   PRICE_LEVELS,
   readinessScore,
+  REGENERATION_SCOPES,
   STAGE_KINDS,
   type Project,
   type Workflow,
@@ -100,6 +109,197 @@ const stageRun = z.object({
     .optional(),
 });
 
+const genesisAssetInput = z.object({
+  label: z.string(),
+  kind: z.enum(["logo", "image", "document", "reference", "other"]),
+  source: z.enum(ASSET_SOURCES),
+  uri: z.string(),
+  mimeType: z.string().optional(),
+  checksum: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  fileName: z.string().optional(),
+});
+
+const genesisInput = z.object({
+  businessName: z.string(),
+  businessType: z.string(),
+  market: z.string(),
+  country: z.string(),
+  audience: z.string(),
+  priceLevel: z.enum(PRICE_LEVELS),
+  notes: z.string(),
+  assets: z.array(genesisAssetInput),
+});
+
+const claudeDesignPrompt = z.object({
+  prompt: z.string(),
+  constraints: z.array(z.string()),
+  references: z.array(z.string()),
+});
+
+const candidate = z.object({
+  id: z.string().transform(asCandidateId),
+  approach: z.enum(["thin-baseline", "evidence-enriched"]),
+  summary: z.string(),
+  designPrompt: claudeDesignPrompt,
+  inputs: z.object({
+    brief: genesisInput,
+    // Discovery snapshots reuse the stage-result codec; output stays opaque.
+    discovery: stageResult.optional(),
+    promptId: z.string().optional(),
+    promptVersion: z.string().optional(),
+    promptHash: z.string().optional(),
+    backend: z.string(),
+    model: z.string().optional(),
+  }),
+  regeneration: z
+    .object({
+      parentId: z.string().transform(asCandidateId),
+      scope: z.enum(REGENERATION_SCOPES),
+      instruction: z.string().optional(),
+    })
+    .optional(),
+  critique: z
+    .object({
+      verdict: z.enum(CRITIQUE_VERDICTS),
+      findings: z.array(
+        z.object({
+          category: z.enum(CRITIQUE_FINDING_CATEGORIES),
+          detail: z.string(),
+          fix: z.string(),
+        }),
+      ),
+      summary: z.string(),
+      backend: z.string(),
+      model: z.string().optional(),
+      promptId: z.string().optional(),
+      promptVersion: z.string().optional(),
+      promptHash: z.string().optional(),
+      refined: z.boolean(),
+    })
+    .optional(),
+  createdAt: date,
+});
+
+/** Rows written before candidates existed have none; default them. */
+const candidates = z
+  .array(candidate)
+  .nullish()
+  .transform((value) => value ?? []);
+
+const evaluation = z.object({
+  violations: z.array(
+    z.object({
+      id: z.enum([
+        "no-screenshots",
+        "missing-logo-asset",
+        "package-missing-sections",
+        "missing-logo-in-mockup",
+        "missing-primary-action",
+        "fabricated-facts",
+        "broken-rtl",
+        "overflow",
+        "blank-screen",
+        "generic-template",
+      ]),
+      label: z.string(),
+      cap: z.number(),
+      detail: z.string().optional(),
+    }),
+  ),
+  scores: z
+    .array(
+      z.object({
+        criterion: z.enum([
+          "brandFidelity",
+          "specificity",
+          "taskClarity",
+          "contentTruth",
+          "responsiveQuality",
+          "localRelevance",
+          "presentationReadiness",
+        ]),
+        score: z.number(),
+        note: z.string(),
+      }),
+    )
+    .optional(),
+  summary: z.string().optional(),
+  readiness: z.number().transform(readinessScore),
+  gate: z.enum(["pass", "warning", "fail"]),
+  judge: z.object({
+    backend: z.string(),
+    model: z.string().optional(),
+  }),
+  evaluatedAt: date,
+});
+
+const artifact = z.object({
+  id: z.string().transform(asArtifactId),
+  candidateId: z.string().transform(asCandidateId),
+  screenshotAssetIds: z.array(z.string().transform(asAssetId)),
+  resultUrl: z.string().optional(),
+  note: z.string().optional(),
+  evaluation: evaluation.optional(),
+  importedAt: date,
+});
+
+const outcome = z.object({
+  id: z.string().transform(asOutcomeId),
+  candidateId: z.string().transform(asCandidateId),
+  artifactId: z.string().transform(asArtifactId).optional(),
+  operatorChanges: z.string().optional(),
+  clientChanges: z.string().optional(),
+  reaction: z.string().optional(),
+  deal: z.enum(["won", "lost", "pending"]),
+  whyItWorked: z.string().optional(),
+  recordedAt: date,
+});
+
+/** Rows written before the learning loop existed have none; default them. */
+const outcomes = z
+  .array(outcome)
+  .nullish()
+  .transform((value) => value ?? []);
+
+const sourceFact = z.object({
+  id: z.string(),
+  category: z.enum(FACT_CATEGORIES),
+  statement: z.string(),
+  provenance: z.enum(FACT_PROVENANCES),
+  citations: z.array(
+    z.object({
+      assetId: z.string().transform(asAssetId),
+      detail: z.string(),
+    }),
+  ),
+  basis: z.string().optional(),
+});
+
+const extraction = z.object({
+  id: z.string().transform(asExtractionId),
+  facts: z.array(sourceFact),
+  examinedAssetIds: z.array(z.string().transform(asAssetId)),
+  backend: z.string(),
+  model: z.string().optional(),
+  promptId: z.string().optional(),
+  promptVersion: z.string().optional(),
+  promptHash: z.string().optional(),
+  extractedAt: date,
+});
+
+/** Rows written before fact extraction existed have none; default them. */
+const extractions = z
+  .array(extraction)
+  .nullish()
+  .transform((value) => value ?? []);
+
+/** Rows written before artifact import existed have none; default them. */
+const artifacts = z
+  .array(artifact)
+  .nullish()
+  .transform((value) => value ?? []);
+
 const historyEvent = z.discriminatedUnion("type", [
   z.object({
     id: z.string().transform(asHistoryEventId),
@@ -128,12 +328,51 @@ const historyEvent = z.discriminatedUnion("type", [
     title: z.string(),
     at: date,
   }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("candidate.added"),
+    candidateId: z.string(),
+    approach: z.string(),
+    scope: z.string().optional(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("artifact.imported"),
+    artifactId: z.string(),
+    candidateId: z.string(),
+    screenshots: z.number().int().nonnegative(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("artifact.evaluated"),
+    artifactId: z.string(),
+    gate: z.string(),
+    readiness: z.number(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("outcome.recorded"),
+    outcomeId: z.string(),
+    deal: z.string(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("evidence.extracted"),
+    extractionId: z.string(),
+    facts: z.number().int().nonnegative(),
+    verified: z.number().int().nonnegative(),
+    at: date,
+  }),
 ]);
 
 const asset = z.object({
   id: z.string().transform(asAssetId),
   label: z.string(),
-  kind: z.enum(["logo", "image", "document", "reference", "other"]),
+  kind: z.enum(["logo", "image", "document", "reference", "mockup", "other"]),
   uri: z.string(),
   mimeType: z.string().optional(),
   // Rows written before uploads existed only ever held operator links.
@@ -207,6 +446,10 @@ export const toProjectRow = (project: Project): NewProjectRow => ({
   knowledge: project.knowledge,
   workflowResults: project.workflow.results,
   workflowRuns: project.workflow.runs,
+  candidates: project.candidates,
+  artifacts: project.artifacts,
+  outcomes: project.outcomes,
+  extractions: project.extractions,
   documents: project.documents,
   assets: project.assets,
   history: project.history,
@@ -243,6 +486,10 @@ export const toProject = (row: ProjectRow): Project => {
     discovery: discovery.parse(row.discovery),
     knowledge: knowledge.parse(row.knowledge),
     workflow,
+    candidates: candidates.parse(row.candidates) as Project["candidates"],
+    artifacts: artifacts.parse(row.artifacts),
+    outcomes: outcomes.parse(row.outcomes),
+    extractions: extractions.parse(row.extractions),
     documents: document.array().parse(row.documents),
     assets: asset.array().parse(row.assets),
     history: historyEvent.array().parse(row.history),

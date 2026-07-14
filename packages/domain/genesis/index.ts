@@ -4,3 +4,7 @@ export * from "./discovery-generator";
 export * from "./prototype-output";
 export * from "./claude-design-package";
 export * from "./prototype-generator";
+export * from "./kit-critic";
+export * from "./candidate";
+export * from "./candidate-amendment";
+export * from "./prospect-rules";

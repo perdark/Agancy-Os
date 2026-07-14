@@ -2,9 +2,12 @@ import "server-only";
 import { join } from "node:path";
 import {
   systemClock,
+  type ArtifactJudge,
   type AssetStorage,
   type Clock,
   type DiscoveryGenerator,
+  type EvidenceExtractor,
+  type KitCritic,
   type ProjectRepository,
   type PrototypeGenerator,
   type StageContext,
@@ -15,6 +18,16 @@ import {
   PlaceholderDiscoveryGenerator,
   PlaceholderPrototypeGenerator,
 } from "@/stages";
+import {
+  ClaudeArtifactJudge,
+  NullArtifactJudge,
+} from "./ai/claude-artifact-judge";
+import {
+  ClaudeEvidenceExtractor,
+  NullEvidenceExtractor,
+} from "./ai/claude-evidence-extractor";
+import { ClaudeKitCritic, NullKitCritic } from "./ai/claude-kit-critic";
+import { CliKitCritic } from "./ai/cli-kit-critic";
 import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
 import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
@@ -61,6 +74,26 @@ export interface Container {
   readonly assetStorage: AssetStorage;
   /** Which AI transport the generators ride; recorded in run diagnostics. */
   readonly aiBackend: AiBackend;
+  /**
+   * The quality gate's independent vision judge. Only the API transport can
+   * look at screenshots today; cli/placeholder bind the null judge and the
+   * gate stays honest about being structural-only.
+   */
+  readonly artifactJudge: ArtifactJudge;
+  /**
+   * The evidence fact-extractor (guide Step 3). Vision-only like the judge:
+   * the API transport reads the uploaded bytes; cli/placeholder bind the
+   * null extractor and the stored extraction says the evidence was not
+   * machine-read.
+   */
+  readonly evidenceExtractor: EvidenceExtractor;
+  /**
+   * The self-critique pass (Engine 1: "critiques itself"). Text-only, so
+   * both api and cli run it; placeholder binds the null critic. The
+   * operator can disable it with `AGENCY_CRITIQUE=off` (skips the second
+   * generation pass entirely).
+   */
+  readonly kitCritic: KitCritic;
 }
 
 /**
@@ -70,6 +103,20 @@ export interface Container {
  */
 const resolveAssetDir = (): string =>
   process.env.AGENCY_ASSET_DIR?.trim() || join(process.cwd(), ".data", "assets");
+
+const buildKitCritic = (backend: AiBackend): KitCritic => {
+  if (process.env.AGENCY_CRITIQUE?.trim().toLowerCase() === "off") {
+    return new NullKitCritic();
+  }
+  switch (backend) {
+    case "api":
+      return new ClaudeKitCritic();
+    case "cli":
+      return new CliKitCritic();
+    case "placeholder":
+      return new NullKitCritic();
+  }
+};
 
 const buildGenerators = (
   backend: AiBackend,
@@ -114,6 +161,13 @@ export const getContainer = (): Container => {
     stages: buildStageRegistry(),
     assetStorage: new LocalAssetStorage(resolveAssetDir()),
     aiBackend,
+    artifactJudge:
+      aiBackend === "api" ? new ClaudeArtifactJudge() : new NullArtifactJudge(),
+    evidenceExtractor:
+      aiBackend === "api"
+        ? new ClaudeEvidenceExtractor()
+        : new NullEvidenceExtractor(),
+    kitCritic: buildKitCritic(aiBackend),
   };
 
   return container;

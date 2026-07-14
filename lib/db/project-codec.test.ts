@@ -31,6 +31,38 @@ describe("project codec", () => {
     expect(revived.documents[0]?.createdAt).toBeInstanceOf(Date);
     expect(revived.history[0]?.at).toBeInstanceOf(Date);
     expect(revived.knowledge.entries[0]?.recordedAt).toBeInstanceOf(Date);
+    expect(revived.extractions[0]?.extractedAt).toBeInstanceOf(Date);
+  });
+
+  it("defaults extractions to empty for rows persisted before fact extraction existed", () => {
+    const row = throughDatabase(toProjectRow(buildMaximalProject()));
+    const legacy = { ...row, extractions: null } as unknown as ProjectRow;
+
+    expect(toProject(legacy).extractions).toEqual([]);
+  });
+
+  it("rejects a verified-looking fact whose provenance is not a known value", () => {
+    const row = throughDatabase(toProjectRow(buildMaximalProject()));
+    const project = buildMaximalProject();
+    const corrupted = {
+      ...row,
+      extractions: [
+        {
+          ...JSON.parse(JSON.stringify(project.extractions[0])),
+          facts: [
+            {
+              id: "fact-1",
+              category: "price",
+              statement: "A cappuccino costs 3,000 IQD.",
+              provenance: "definitely-true",
+              citations: [],
+            },
+          ],
+        },
+      ],
+    } as unknown as ProjectRow;
+
+    expect(() => toProject(corrupted)).toThrow();
   });
 
   it("defaults asset source to operator-link for rows persisted before uploads existed", () => {

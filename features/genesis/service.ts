@@ -5,12 +5,17 @@ import {
   type GenesisInput,
   type Project,
   type PrototypeOutput,
+  type RegenerationScope,
   type StageResult,
 } from "@/domain";
+import { hashPrompt } from "@/lib/ai/prompt-hash";
 import { getContainer } from "@/lib/container";
+import { extractEvidenceFacts } from "@/features/projects/extract-facts";
 import {
+  regenerateCandidateRun,
   resumeGenesisRun,
   runGenesisDraftFirst,
+  type CandidateRegenerationOutcome,
   type GenesisRunnerDeps,
 } from "./genesis-runner";
 
@@ -31,8 +36,16 @@ export interface GenesisResult {
  * failed or interrupted generation is a resumable project — not lost work.
  */
 const runnerDeps = (): GenesisRunnerDeps => {
-  const { projects, discoveryGenerator, prototypeGenerator, context, aiBackend } =
-    getContainer();
+  const {
+    projects,
+    discoveryGenerator,
+    prototypeGenerator,
+    context,
+    aiBackend,
+    assetStorage,
+    evidenceExtractor,
+    kitCritic,
+  } = getContainer();
   return {
     projects,
     discoveryGenerator,
@@ -40,6 +53,24 @@ const runnerDeps = (): GenesisRunnerDeps => {
     ids: context.ids,
     clock: context.clock,
     aiBackend,
+    hashText: hashPrompt,
+    kitCritic,
+    // Facts-first generation (Engine 1): the runner calls this before the
+    // stages so the first candidates are grounded in extracted facts.
+    ensureFacts: async (project) => {
+      const { project: updated } = await extractEvidenceFacts(
+        { projectId: project.id },
+        {
+          projects,
+          assetStorage,
+          extractor: evidenceExtractor,
+          extractorBackend: aiBackend,
+          ids: context.ids,
+          clock: context.clock,
+        },
+      );
+      return updated;
+    },
   };
 };
 
@@ -50,3 +81,20 @@ export const runGenesis = async (
 /** Re-run only the stages a saved project still needs (see genesis-runner). */
 export const resumeGenesis = async (projectId: string): Promise<GenesisResult> =>
   resumeGenesisRun(asProjectId(projectId), runnerDeps());
+
+/** Regenerate one candidate at operator-chosen scope (see genesis-runner). */
+export const regenerateCandidate = async (args: {
+  projectId: string;
+  candidateId: string;
+  scope: RegenerationScope;
+  instruction?: string;
+}): Promise<CandidateRegenerationOutcome> =>
+  regenerateCandidateRun(
+    {
+      projectId: asProjectId(args.projectId),
+      candidateId: args.candidateId,
+      scope: args.scope,
+      instruction: args.instruction,
+    },
+    runnerDeps(),
+  );

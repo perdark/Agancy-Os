@@ -2,6 +2,7 @@ import "server-only";
 import type {
   DiscoveryOutput,
   GenesisInput,
+  PrototypeGenerationOptions,
   PrototypeGenerator,
   PrototypeOutput,
   StageContext,
@@ -31,8 +32,14 @@ export class CliPrototypeGenerator implements PrototypeGenerator {
     input: GenesisInput,
     discovery: StageResult<DiscoveryOutput>,
     context: StageContext,
+    options?: PrototypeGenerationOptions,
   ): Promise<StageResult<PrototypeOutput>> {
-    const rendered = prototypePrompt.render({ input, discovery });
+    const rendered = prototypePrompt.render({
+      input,
+      discovery,
+      directives: options?.directives,
+      facts: options?.facts,
+    });
     // Prompt identity is reported before the call so failed runs still carry it.
     context.probe?.report({
       promptId: prototypePrompt.id,

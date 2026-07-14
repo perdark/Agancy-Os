@@ -13,7 +13,12 @@ export type HistoryEvent =
   | ProjectCreatedEvent
   | StageRunEvent
   | StageAdvancedEvent
-  | DocumentAddedEvent;
+  | DocumentAddedEvent
+  | CandidateAddedEvent
+  | ArtifactImportedEvent
+  | ArtifactEvaluatedEvent
+  | OutcomeRecordedEvent
+  | EvidenceExtractedEvent;
 
 interface HistoryEventBase {
   readonly id: HistoryEventId;
@@ -41,6 +46,41 @@ export interface DocumentAddedEvent extends HistoryEventBase {
   readonly type: "document.added";
   readonly documentId: string;
   readonly title: string;
+}
+
+export interface CandidateAddedEvent extends HistoryEventBase {
+  readonly type: "candidate.added";
+  readonly candidateId: string;
+  readonly approach: string;
+  /** Set when the candidate came from a scoped regeneration. */
+  readonly scope?: string;
+}
+
+export interface ArtifactImportedEvent extends HistoryEventBase {
+  readonly type: "artifact.imported";
+  readonly artifactId: string;
+  readonly candidateId: string;
+  readonly screenshots: number;
+}
+
+export interface ArtifactEvaluatedEvent extends HistoryEventBase {
+  readonly type: "artifact.evaluated";
+  readonly artifactId: string;
+  readonly gate: string;
+  readonly readiness: number;
+}
+
+export interface OutcomeRecordedEvent extends HistoryEventBase {
+  readonly type: "outcome.recorded";
+  readonly outcomeId: string;
+  readonly deal: string;
+}
+
+export interface EvidenceExtractedEvent extends HistoryEventBase {
+  readonly type: "evidence.extracted";
+  readonly extractionId: string;
+  readonly facts: number;
+  readonly verified: number;
 }
 
 export type HistoryEventType = HistoryEvent["type"];

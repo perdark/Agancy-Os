@@ -50,7 +50,30 @@ describe("DrizzleProjectRepository (PGlite)", () => {
     expect(loaded?.workflow.runs.prototype?.diagnostics?.error).toBe(
       "The claude CLI call failed before returning a result.",
     );
-    expect(loaded?.history).toHaveLength(4);
+    expect(loaded?.history).toHaveLength(9);
+    // Candidates round-trip with revived Dates and their Discovery snapshot.
+    expect(loaded?.candidates).toHaveLength(2);
+    expect(loaded?.candidates[1]?.createdAt).toBeInstanceOf(Date);
+    expect(
+      loaded?.candidates[1]?.inputs.discovery?.producedAt,
+    ).toBeInstanceOf(Date);
+    // Artifacts round-trip with revived Dates and branded ids intact.
+    expect(loaded?.artifacts).toHaveLength(1);
+    expect(loaded?.artifacts[0]?.importedAt).toBeInstanceOf(Date);
+    expect(loaded?.artifacts[0]?.screenshotAssetIds).toEqual(["asset-3"]);
+    // The stored evaluation and outcome survive with Dates revived.
+    expect(loaded?.artifacts[0]?.evaluation?.gate).toBe("warning");
+    expect(loaded?.artifacts[0]?.evaluation?.evaluatedAt).toBeInstanceOf(Date);
+    expect(loaded?.outcomes).toHaveLength(1);
+    expect(loaded?.outcomes[0]?.deal).toBe("won");
+    expect(loaded?.outcomes[0]?.recordedAt).toBeInstanceOf(Date);
+    // The extraction survives with revived Dates, branded ids, and citations.
+    expect(loaded?.extractions).toHaveLength(1);
+    expect(loaded?.extractions[0]?.extractedAt).toBeInstanceOf(Date);
+    expect(loaded?.extractions[0]?.facts[0]?.citations[0]?.assetId).toBe(
+      "asset-1",
+    );
+    expect(loaded?.extractions[0]?.examinedAssetIds).toEqual(["asset-1"]);
   });
 
   it("upserts on save so run-state transitions overwrite the same row", async () => {

@@ -7,16 +7,18 @@ import {
   GENESIS_PUBLIC_ERROR_MESSAGES,
   toGenesisPublicErrorMessage,
 } from "./errors";
-import { GenesisStageError } from "./genesis-runner";
+import { GenesisRegenerationError, GenesisStageError } from "./genesis-runner";
 import {
   GENESIS_INPUT_LIMITS,
   genesisEvidenceUploadSchema,
   genesisInputSchema,
   genesisLogoUploadSchema,
   genesisUploadBatchSchema,
+  regenerateCandidateSchema,
   type GenesisFormValues,
+  type RegenerateCandidateValues,
 } from "./schema";
-import { resumeGenesis, runGenesis } from "./service";
+import { regenerateCandidate, resumeGenesis, runGenesis } from "./service";
 
 export type GenesisActionResult =
   | { readonly ok: true; readonly projectId: string }
@@ -187,6 +189,47 @@ const storeUpload = async (
  * Retry a saved project's generation. Only the stages that still need work
  * re-run — a failed Prototype restarts from the saved Discovery result.
  */
+/**
+ * Regenerate a stored candidate at the operator's chosen scope. Every outcome
+ * is a NEW candidate on the project; the parent is never overwritten. Scoped
+ * requests without an instruction are rejected at the edge.
+ */
+export const regenerateProjectCandidate = async (
+  values: RegenerateCandidateValues,
+): Promise<GenesisActionResult> => {
+  const parsed = regenerateCandidateSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: GENESIS_PUBLIC_ERROR_MESSAGES.invalidInput };
+  }
+
+  try {
+    const { project } = await regenerateCandidate({
+      projectId: parsed.data.projectId,
+      candidateId: parsed.data.candidateId,
+      scope: parsed.data.scope,
+      instruction: parsed.data.instruction || undefined,
+    });
+    revalidatePath(`/projects/${project.id}`);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    console.error("Candidate regeneration failed:", error);
+    // A bad target (unknown project/candidate, missing instruction) is the
+    // caller's input problem, not a generation failure.
+    if (error instanceof GenesisRegenerationError) {
+      return { ok: false, error: GENESIS_PUBLIC_ERROR_MESSAGES.invalidInput };
+    }
+    if (error instanceof GenesisStageError) {
+      revalidatePath(`/projects/${error.projectId}`);
+      return {
+        ok: false,
+        error: toGenesisPublicErrorMessage(error),
+        projectId: error.projectId,
+      };
+    }
+    return { ok: false, error: toGenesisPublicErrorMessage(error) };
+  }
+};
+
 export const resumeProjectGeneration = async (
   projectId: string,
 ): Promise<GenesisActionResult> => {

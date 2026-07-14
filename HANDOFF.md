@@ -1,9 +1,247 @@
 # HANDOFF — session state
 
-**Date:** 2026-07-11 (Claude/Fable 5; owner continuing from mobile)
-**Branch:** `claude/agency-os-foundation-gr9yso`
+**Date:** 2026-07-14 (Claude/Fable 5)
+**Branch:** `claude/agency-os-development-8mb5wv`
+
+## Update 2026-07-14 (later) — Engine 1 strengthened: self-critique + facts-first
+
+The owner asked about Engine 2 and chose to stick to the vision: strengthen
+Engine 1 instead. Two slices landed:
+
+**Facts-first generation.** The genesis runner now extracts source facts
+BEFORE the stages run (`ensureFacts` hook, bound in
+`features/genesis/service.ts` to the existing `extractEvidenceFacts`
+use-case), so the FIRST candidates are grounded without a manual click.
+Non-fatal by design: a failed extraction logs and generation proceeds. The
+manual "Extract facts" button remains for re-extraction.
+
+**Self-critique + one refine pass** (vision: "iterates, critiques itself").
+New `KitCritic` port (`packages/domain/genesis/kit-critic.ts`) with prompt
+`prototype.self-critic@0.1.0`: an adversarial review of the generated kit
+against the brief and fact base — any-other-shop test per screen,
+unsupported specifics vs the fact list, buyer-fit, weak screens. Verdict
+`strong` stores the critique as-is; `needs-refinement` triggers exactly ONE
+refine pass through the persisted stage lifecycle (attempts increments),
+with the findings' fixes as directives (an operator's regeneration
+instruction is preserved ahead of them). Text-only, so BOTH transports run
+it (`lib/ai/claude-kit-critic.ts`, `lib/ai/cli-kit-critic.ts`, shared
+`critic-codec.ts`); placeholder binds `NullKitCritic`; `AGENCY_CRITIQUE=off`
+disables it. The candidate stores `critique` (verdict, findings, summary,
+backend/model/prompt provenance, `refined`) — codec + fixture + PGlite
+round-trip extended; the candidates card shows an expandable
+"Self-critique" line. Failure paths are all non-fatal: the operator always
+gets a kit — critiqued, refined, or honestly un-critiqued.
+
+**Verification:** 243 tests pass (13 new), typecheck, lint zero warnings,
+production build. NOT browser-tested (owner does that on the laptop):
+watch for the critique line on new candidates, attempts=2 on refined runs,
+and generation time roughly doubling when a refine pass fires (CLI).
+
+---
+
+## Update 2026-07-14 — Step 3 fact-extraction DONE; vision recorded
+
+**Step 3 is now fully DONE.** The last open items — source facts with
+citations, every statement marked `verified` / `operator-provided` /
+`hypothesis` — are implemented end to end:
+
+- **Domain** (`packages/domain/project/facts.ts`): `SourceFact` +
+  `EvidenceExtraction` (append-only on the project). The invariant lives in
+  `sanitizeExtractedFacts`: a `verified` claim survives only with a citation
+  into evidence that was actually examined — otherwise it is demoted to
+  `hypothesis` with the demotion named. `deriveOperatorFacts` records the
+  brief's own statements deterministically (no AI).
+- **Port + transports**: `EvidenceExtractor`
+  (`packages/domain/project/evidence-extractor.ts`); the API transport
+  (`lib/ai/claude-evidence-extractor.ts`, `claude-sonnet-5`) attaches real
+  evidence bytes (images as image parts, PDFs as file parts) after versioned
+  prompt `evidence.fact-extraction@0.1.0` and maps document-number citations
+  back to assets. cli/placeholder bind `NullEvidenceExtractor`: the stored
+  extraction then has empty `examinedAssetIds` and only operator facts —
+  honest, like the Step 6 judge.
+- **Slice**: `extractEvidenceFacts` use-case, `extractProjectFacts` action,
+  "Source facts" card on the project screen (provenance badges, citations
+  linking to the asset previews, provenance footer, amber note when the
+  evidence was not machine-read).
+- **Persistence**: `extractions` JSONB column
+  (`drizzle/0004_colorful_luckman.sql`), codec with Date revival + legacy
+  default `[]`, PGlite round-trip extended, history event
+  `evidence.extracted`.
+- **Generation feed**: `prototype.first-meeting-kit` is now **v0.3.0** — a
+  SOURCE FACTS section separates VERIFIED (use verbatim, with citation
+  details) / OPERATOR-PROVIDED / HYPOTHESES. The genesis runner passes the
+  latest extraction's facts into Prototype runs and `entire` regenerations.
+  The thin baseline stays untouched (the Khatuna control).
+- **Vision recorded**: `docs/VISION.md` — the three-engine roadmap. Engine 1
+  (Deep Creative Engine, the first-meeting loop) is the ONLY current
+  priority; Engines 2–3 and the Memory/Evolution/Growth/Failure ideas are
+  explicitly do-not-build-yet. Pointers added in the guide §10 and
+  PRODUCT.md.
+
+**Verification performed:** 230 tests pass (20 new: sanitizer/operator facts,
+extraction prompt, use-case incl. demotion + null-extractor honesty +
+append-only re-extraction, prompt v0.3.0 facts section, codec/PGlite
+round-trips), typecheck, lint zero warnings, production build.
+
+**Owner's browser checklist (laptop, by their choice):** intake with logo +
+evidence → "Extract facts from evidence" on the project page (API backend
+for real extraction; cli shows the honest operator-only note) → facts card
+shows verified-with-citations vs hypotheses → regenerate a candidate with
+scope "entire" → the new package contains the SOURCE FACTS section. Then the
+full Lotus Cafe acceptance run (Steps 5–8 remain browser-untested too).
+
+**Remaining gaps:** Step 0 benchmark materials (blocked on owner);
+extraction is operator-triggered, not yet automatic during intake;
+durability on a real Postgres server still undemonstrated (PGlite only).
+
+---
+
+*Previous handoff (2026-07-11, branch `claude/step-4-project-5d8iqp`):*
+
+## Update 2026-07-11 (final) — Steps 6, 7, 8 built; owner will test
+
+All three remaining core steps are implemented and unit-verified (210 tests
+pass, typecheck, lint, production build). **Nothing in Steps 5–8 has been
+browser-tested or run against a real prospect yet — the owner will test.**
+
+**Step 6 — artifact quality gate.** `ArtifactEvaluation`
+(`packages/domain/project/artifact-evaluation.ts`): structural checks
+(no screenshots / no logo / incomplete package) plus an independent vision
+judge behind the `ArtifactJudge` port. API backend sends real screenshot
+bytes to `claude-sonnet-5` with a versioned judge prompt
+(`artifact-judge.quality-gate@0.1.0`); cli/placeholder bind `NullArtifactJudge`
+and the stored verdict says structural-only. Violations come from a closed
+set, each with a readiness cap; final readiness = min(mean AI score, caps) —
+a fabricated-facts flag caps a 95-scored artifact to 30 (tested). Without a
+vision judge the base is 55, so structural-only never reads better than
+"warning". Verdict stored on the artifact (`evaluation` field, JSONB —
+no migration needed), history event `artifact.evaluated`, "Run quality
+gate" button on the mockup card. Meeting readiness now blocks unevaluated
+and gate-failed mockups; warnings become cautions.
+
+**Step 7 — Meeting Mode.** `buildMeetingBrief`
+(`packages/domain/project/meeting-brief.ts`) returns null until a
+presentable artifact exists; the brief carries only business name, concept
+sentence, screenshots, result URL, ≤5 assumptions, ≤5 client questions — a
+test serializes it and asserts no backend/model/prompt/readiness strings
+leak. `/projects/[id]/meeting` renders it with prev/next screen navigation;
+"Open Meeting Mode" appears in the project header.
+
+**Step 8 — learning loop.** `MeetingOutcome`
+(`packages/domain/project/outcomes.ts`): append-only records tied to the
+presented candidate (+ artifact), deal won/lost/pending, operator/client
+changes, reaction, why-it-worked, `timeToFirstArtifactMs` metric. New
+`outcomes` JSONB column + migration (`drizzle/0003_cuddly_champions.sql`),
+codec, history event `outcome.recorded`, outcomes card + form on the
+project screen.
+
+**What the owner should test in the browser (all of Steps 5–8):**
+intake → copy package → run in Claude Design → import screenshots →
+run the quality gate → check readiness states → open Meeting Mode →
+record an outcome. Then the Lotus Cafe acceptance test end-to-end.
+
+**Known limitations:** the vision judge requires `AGENCY_AI_BACKEND=api`
+with `ANTHROPIC_API_KEY` (the CLI one-shot has no image path — structural-
+only there); desktop-vs-mobile screenshot distinction is not modelled yet
+(the judge sees all screenshots together); Step 0 (benchmark materials) and
+Step 3's evidence fact-extraction remain open.
+
+## Update 2026-07-11 (latest) — Step 5 DONE (browser check deferred)
+
+Guide §7 Step 5 (close the Claude Design handoff) is implemented:
+
+- **`MockupArtifact`** (`packages/domain/project/artifacts.ts`): screenshots
+  and/or a result URL imported back from Claude Design, tied to the
+  CANDIDATE whose package produced it (the candidate already pins prompt,
+  inputs, and model — no duplication). Screenshots are stored through the
+  asset-storage port as assets of new kind `"mockup"` and stream back
+  through the existing asset route.
+- **Meeting readiness** (`packages/domain/project/meeting-readiness.ts`):
+  pure derivation — `no-package` / `prompt-only` / `mockup-imported`. A
+  prompt-only project can never read as ready; a missing logo is a named
+  blocker; an imported mockup is ready with an explicit caution that the
+  Step 6 quality gate does not exist yet.
+- **Mockup-first project screen** (guide §8): Selected mockup → Meeting
+  readiness → the ONE dominant handoff card ("Copy complete package" for
+  the selected candidate + attach-checklist + import form) → workflow →
+  candidates → brief/evidence → stage details. The duplicate package card
+  was removed from the Prototype stage view. Mockup screenshots are
+  excluded from the evidence locker.
+- `importProjectArtifact` server action: multipart (screenshots
+  image-allowlisted, 10MB each / 50MB total / 12 max, URL and note
+  bounded), bytes through the asset-storage port, stable public errors.
+  New `artifacts` JSONB column + migration
+  (`drizzle/0002_flowery_maddog.sql`); legacy rows decode to `[]`.
+
+**Verification performed:** 190 tests pass (11 new), typecheck, lint zero
+warnings, production build. **Browser verification deliberately deferred at
+the owner's request** — the import flow and mockup-first layout have NOT
+been driven in a real browser yet; do that together with the Lotus Cafe
+acceptance test.
+
+**Remaining gap to a meeting-ready artifact:** the Step 6 quality gate
+(evaluate the rendered screenshots; deterministic failures cap readiness).
+Step 3's evidence fact-extraction with citations and Step 0's owner
+materials remain open. §11's five immediate tasks are now complete except
+task 2 (blocked on owner); the Lotus Cafe acceptance test through the full
+workflow — including a real Claude Design run and import — has not been
+executed.
+
+## Update 2026-07-11 (later) — Step 4 DONE, Step 3 browser-verified
+
+Guide §7 Step 4 (candidate directions) is complete:
+
+- Every generation now records **two candidates** on the project: a
+  deterministic **thin-baseline** package (versioned template
+  `thin-baseline.first-meeting@0.1.0` — the Khatuna control, recorded even
+  when AI generation fails) and the **evidence-enriched** package from the
+  Prototype stage. Each candidate stores its exact inputs: brief snapshot,
+  Discovery snapshot, prompt id/version/SHA-256, backend, and actual model
+  (`packages/domain/genesis/candidate.ts`).
+- The prototype prompt is now **v0.2.0**: the global Arabic-RTL/mobile/
+  commerce hard floor was replaced by a universal truthfulness-first floor
+  plus prospect-conditional rules
+  (`packages/domain/genesis/prospect-rules.ts`) — each active rule names the
+  brief trigger that switched it on. A Georgian cafe gets no RTL rules; an
+  Iraqi one does.
+- **Scoped regeneration** (`regenerateCandidateRun` in the genesis runner):
+  `entire` re-runs Prototype through the persisted stage lifecycle with the
+  operator's correction injected as overriding truth (port gained optional
+  `PrototypeGenerationOptions.directives`); `screen`/`copy`/`layout`/
+  `assumption` build a deterministic paste-ready `CLAUDE DESIGN AMENDMENT`
+  for the same Claude Design session. Every regeneration appends a NEW
+  candidate linked to its parent — nothing is overwritten.
+- Candidates render on the project page above the Brief (guide §8 order),
+  newest first, with copy actions, provenance lines, and a per-candidate
+  regenerate form. New `candidates` JSONB column + migration
+  (`drizzle/0001_dapper_texas_twister.sql`); legacy rows decode to `[]` and
+  are backfilled with both candidates on their next resume.
+
+**Verification performed:** 179 tests pass (28 new: prospect rules, thin
+template, amendment bytes, clipboard payloads, runner candidate recording,
+all regeneration paths, PGlite candidate round-trips with Date revival),
+typecheck, lint zero warnings, production build. Browser (placeholder
+backend, dev server): intake with real logo + evidence PNG uploads →
+previews rendered → bytes stored under `.data/assets/` and served 200 via
+the asset route (closes Step 3's open browser check) → both candidates
+listed with provenance → "one screen" regeneration added an amendment
+candidate → "entire" regeneration re-ran Prototype (attempts 2) and added a
+full candidate with the correct copy label. Desktop + mobile screenshots
+inspected; no horizontal overflow. Browser verification found and fixed two
+UI defects: entire-scope regenerations mislabelled "Copy amendment", and the
+regenerate form kept a stale scope when reopened.
+
+**Remaining gap to a meeting-ready artifact:** candidates are still prompt
+packages — no rendered mockup is stored yet. Next in order: guide §11 task 5
+/ §7 Step 5 — artifact import (screenshots or URL) and mockup-first project
+screen; then the Step 6 quality gate. Step 3's evidence fact-extraction with
+citations also remains open. The CLI backend has not re-verified this slice
+(this container has no `claude` CLI); the placeholder run exercised the full
+persistence and UI path, and the CLI transport only changed by passing
+`directives` through the existing prompt render.
 
 ## Update 2026-07-11 — Step 3 committed, needs browser verification
+*(browser verification completed later this day — see the update above)*
 
 The logo/evidence-upload slice (guide §11 task 4) is now committed:
 

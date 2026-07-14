@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  asAssetId,
   buildStageResult,
   type DiscoveryOutput,
   type GenesisInput,
+  type SourceFact,
   type StageResult,
 } from "@/domain";
 import { prototypePrompt } from "./prototype.prompt";
@@ -67,15 +69,88 @@ const discovery: StageResult<DiscoveryOutput> = buildStageResult(
 );
 
 describe("prototypePrompt", () => {
-  it("renders world-first with the brief, the decode, the mandated opening, and the hard floor", () => {
+  it("renders world-first with the brief, the decode, the mandated opening, and the floor", () => {
     const rendered = prototypePrompt.render({ input, discovery });
 
     expect(rendered).toContain("Khatuna");
     expect(rendered).toContain("8 numbered steps"); // mandated sentence 1
     expect(rendered).toContain("any other shop's app"); // mandated sentence 2
-    expect(rendered).toContain("line-height 1.7"); // hard-floor marker
+    expect(rendered).toContain("never invented"); // universal truthfulness rule
     expect(rendered).toContain("A premium wedding-planning experience."); // discovery feeds in
     expect(rendered).toContain("Khatuna logo"); // asset reference
+  });
+
+  it("applies locale rules conditionally, naming the trigger in this brief", () => {
+    // Iraq → the Arabic floor applies, with its reason attached.
+    const iraqi = prototypePrompt.render({ input, discovery });
+    expect(iraqi).toContain("line-height 1.7");
+    expect(iraqi).toContain("applies because the brief's country is Iraq");
+
+    // A Georgian cafe gets NO Arabic-RTL floor — rules follow the prospect.
+    const georgian = prototypePrompt.render({
+      input: { ...input, country: "Georgia" },
+      discovery,
+    });
+    expect(georgian).not.toContain("RTL");
+    expect(georgian).not.toContain("line-height 1.7");
+  });
+
+  it("injects operator corrections as overriding truth when regenerating", () => {
+    const rendered = prototypePrompt.render({
+      input,
+      discovery,
+      directives: ["Bookings happen by phone, not WhatsApp."],
+    });
+
+    expect(rendered).toContain("OPERATOR CORRECTIONS");
+    expect(rendered).toContain("- Bookings happen by phone, not WhatsApp.");
+
+    const without = prototypePrompt.render({ input, discovery });
+    expect(without).not.toContain("OPERATOR CORRECTIONS");
+  });
+
+  it("grounds the kit in source facts, separated by provenance with citations", () => {
+    const facts: SourceFact[] = [
+      {
+        id: "f1",
+        category: "price",
+        statement: "Packages start at 2,500,000 IQD.",
+        provenance: "verified",
+        citations: [
+          { assetId: asAssetId("asset-1"), detail: "pricing post, caption" },
+        ],
+      },
+      {
+        id: "f2",
+        category: "audience",
+        statement: "The stated audience is: engaged couples.",
+        provenance: "operator-provided",
+        citations: [],
+        basis: 'Brief field "audience"',
+      },
+      {
+        id: "f3",
+        category: "tone",
+        statement: "The brand voice is warm and formal.",
+        provenance: "hypothesis",
+        citations: [],
+        basis: "Caption style across posts.",
+      },
+    ];
+
+    const rendered = prototypePrompt.render({ input, discovery, facts });
+
+    expect(rendered).toContain("SOURCE FACTS");
+    expect(rendered).toContain(
+      "- [price] Packages start at 2,500,000 IQD. (seen in: pricing post, caption)",
+    );
+    expect(rendered).toContain("never alter names, prices, hours, or wording");
+    expect(rendered).toContain("OPERATOR-PROVIDED — treat as true:");
+    expect(rendered).toContain("HYPOTHESES — unconfirmed.");
+    expect(rendered).toContain("- [tone] The brand voice is warm and formal.");
+
+    const without = prototypePrompt.render({ input, discovery });
+    expect(without).not.toContain("SOURCE FACTS");
   });
 
   it("tells the model which assets are real uploaded files and which are links", () => {

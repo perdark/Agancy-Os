@@ -1,5 +1,5 @@
-import type { AssetKind, AssetSource } from "../project/assets";
-import type { PriceLevel } from "../project/identity";
+import type { Asset, AssetKind, AssetSource } from "../project/assets";
+import type { PriceLevel, ProjectIdentity } from "../project/identity";
 
 /**
  * The input to Project Genesis — the first feature of Version 1.
@@ -37,3 +37,31 @@ export interface GenesisAssetInput {
   readonly sizeBytes?: number;
   readonly fileName?: string;
 }
+
+/**
+ * The brief is fully reconstructible from the aggregate it created — used by
+ * resume and by any later step (fact extraction) that needs the same input
+ * the generation saw.
+ */
+export const rebuildBrief = (
+  identity: ProjectIdentity,
+  assets: readonly Asset[],
+): GenesisInput => ({
+  businessName: identity.businessName,
+  businessType: identity.businessType,
+  market: identity.market,
+  country: identity.country,
+  audience: identity.audience,
+  priceLevel: identity.priceLevel,
+  notes: identity.notes,
+  assets: assets.map((asset) => ({
+    label: asset.label,
+    kind: asset.kind,
+    source: asset.source,
+    uri: asset.uri,
+    mimeType: asset.mimeType,
+    checksum: asset.checksum,
+    sizeBytes: asset.sizeBytes,
+    fileName: asset.fileName,
+  })),
+});
