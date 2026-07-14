@@ -80,6 +80,28 @@ function CandidateItem({
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p>{candidate.summary}</p>
+        {candidate.critique ? (
+          <details className="rounded-md border bg-muted/40 p-2 text-xs">
+            <summary className="cursor-pointer font-medium">
+              {candidate.critique.headline}
+            </summary>
+            <p className="mt-2 text-muted-foreground">
+              {candidate.critique.summary}
+            </p>
+            {candidate.critique.findings.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-1 pl-4">
+                {candidate.critique.findings.map((finding, index) => (
+                  <li key={index}>
+                    {finding.detail}{" "}
+                    <span className="text-muted-foreground">
+                      Fix: {finding.fix}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </details>
+        ) : null}
         <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs leading-relaxed">
           {candidate.payload}
         </pre>

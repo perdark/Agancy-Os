@@ -22,9 +22,12 @@ import {
   type Clock,
   type DiscoveryGenerator,
   type DiscoveryOutput,
+  type CandidateCritique,
   type GenerationProbeEntry,
   type GenesisInput,
   type IdGenerator,
+  type KitCritic,
+  type KitCritiqueResult,
   type Project,
   type ProjectId,
   type PrototypeGenerationOptions,
@@ -60,6 +63,20 @@ export interface GenesisRunnerDeps {
   readonly aiBackend: string;
   /** SHA-256 of a rendered prompt; injected so the runner stays pure. */
   readonly hashText: (text: string) => string;
+  /**
+   * Extract source facts before the stages run (guide Step 3 / Engine 1),
+   * returning the updated (already saved) project. Optional and NON-FATAL:
+   * facts are an enhancement — a failed extraction must never block the
+   * generation the operator asked for.
+   */
+  readonly ensureFacts?: (project: Project) => Promise<Project>;
+  /**
+   * Self-critique of the generated kit (Engine 1). Optional and NON-FATAL:
+   * a failed critique keeps the un-critiqued kit. A needs-refinement
+   * verdict triggers exactly ONE refine pass through the persisted stage
+   * lifecycle, with the findings' fixes applied as directives.
+   */
+  readonly kitCritic?: KitCritic;
 }
 
 export interface GenesisRunOutcome {
@@ -172,6 +189,16 @@ const executeGenesisStages = async (
   // generation still leaves the operator the Khatuna-style control package.
   let project = await ensureThinBaselineCandidate(initial, input, deps);
 
+  // Facts first (Engine 1): extract from the evidence before any stage runs
+  // so even the FIRST candidates are grounded. Never blocks generation.
+  if (deps.ensureFacts && project.extractions.length === 0) {
+    try {
+      project = await deps.ensureFacts(project);
+    } catch (cause) {
+      console.error("Evidence fact-extraction failed; generating without facts:", cause);
+    }
+  }
+
   let discoveryResult = project.workflow.results.discovery as
     | StageResult<DiscoveryOutput>
     | undefined;
@@ -217,14 +244,122 @@ const executeGenesisStages = async (
     (candidate) => candidate.approach === "evidence-enriched",
   );
   if (prototypeRan || !hasEnriched) {
+    // Engine 1's self-critique: review the fresh kit; real findings buy
+    // exactly one refine pass before the operator ever sees the candidate.
+    let critique: CandidateCritique | undefined;
+    if (prototypeRan) {
+      ({ project, result: prototypeResult, critique } = await critiqueAndRefine(
+        project,
+        input,
+        discoveryResult,
+        prototypeResult,
+        deps,
+      ));
+    }
     project = await saveCandidate(
       project,
-      buildEnrichedCandidate(project, input, discoveryResult, prototypeResult, deps),
+      buildEnrichedCandidate(
+        project,
+        input,
+        discoveryResult,
+        prototypeResult,
+        deps,
+        undefined,
+        critique,
+      ),
       deps,
     );
   }
 
   return { project, discoveryResult, prototypeResult };
+};
+
+/**
+ * Critique the generated kit and, when the verdict demands it, run ONE
+ * refine pass with the findings' fixes as directives. Every failure path is
+ * non-fatal: the operator always ends up with a kit — critiqued, refined,
+ * or honestly un-critiqued.
+ */
+const critiqueAndRefine = async (
+  initial: Project,
+  input: GenesisInput,
+  discovery: StageResult<DiscoveryOutput>,
+  result: StageResult<PrototypeOutput>,
+  deps: GenesisRunnerDeps,
+  baseDirectives: readonly string[] = [],
+): Promise<{
+  project: Project;
+  result: StageResult<PrototypeOutput>;
+  critique?: CandidateCritique;
+}> => {
+  if (!deps.kitCritic) return { project: initial, result };
+
+  const facts = latestExtraction(initial.extractions)?.facts ?? [];
+  let verdict: KitCritiqueResult | null;
+  try {
+    verdict = await deps.kitCritic.critique({
+      brief: input,
+      facts,
+      prototype: result.output,
+    });
+  } catch (cause) {
+    console.error("Self-critique failed; keeping the un-critiqued kit:", cause);
+    return { project: initial, result };
+  }
+  if (!verdict) return { project: initial, result };
+
+  const critiqueBase = {
+    verdict: verdict.verdict,
+    findings: verdict.findings,
+    summary: verdict.summary,
+    backend: deps.aiBackend,
+    model: verdict.model,
+    promptId: verdict.promptId,
+    promptVersion: verdict.promptVersion,
+    promptHash: verdict.promptHash,
+  };
+  if (verdict.verdict === "strong" || verdict.findings.length === 0) {
+    return {
+      project: initial,
+      result,
+      critique: { ...critiqueBase, refined: false },
+    };
+  }
+
+  const directives = [
+    ...baseDirectives,
+    ...verdict.findings.map((finding) => finding.fix),
+  ];
+  const queued: Project = {
+    ...initial,
+    workflow: queueStageRun(initial.workflow, "prototype", deps.clock.now()),
+  };
+  await deps.projects.save(queued);
+  try {
+    const { project: refinedProject, result: refined } =
+      await runPersistedStage(queued, "prototype", deps, (context) =>
+        deps.prototypeGenerator.generate(input, discovery, context, {
+          directives,
+          ...(facts.length > 0 ? { facts } : {}),
+        }),
+      );
+    return {
+      project: refinedProject,
+      result: refined,
+      critique: { ...critiqueBase, refined: true },
+    };
+  } catch (cause) {
+    // The refine pass failed after the critique found issues. Keep the
+    // original kit and the critique — the operator sees the findings and
+    // can regenerate manually. (The failed run stays in the run log.)
+    console.error("Refine pass failed; keeping the original kit:", cause);
+    const persisted = await deps.projects.findById(initial.id);
+    return {
+      project: persisted ?? initial,
+      result,
+      critique: { ...critiqueBase, refined: false },
+    };
+  }
 };
 
 /** Asset labels double as the package's reference list for thin candidates. */
@@ -272,6 +407,7 @@ const buildEnrichedCandidate = (
   prototype: StageResult<PrototypeOutput>,
   deps: GenesisRunnerDeps,
   regeneration?: CandidateRegeneration,
+  critique?: CandidateCritique,
 ): Candidate => {
   // The run's diagnostics hold what actually produced this result — the
   // versioned prompt identity and the model the transport reported.
@@ -291,6 +427,7 @@ const buildEnrichedCandidate = (
       model: diagnostics?.model,
     },
     ...(regeneration ? { regeneration } : {}),
+    ...(critique ? { critique } : {}),
     createdAt: deps.clock.now(),
   };
 };
@@ -541,14 +678,29 @@ export const regenerateCandidateRun = async (
         options,
       ),
   );
-  const candidate = buildEnrichedCandidate(
+  // The regenerated kit goes through the same self-critique loop; the
+  // operator's own instruction is preserved as a directive in any refine.
+  const {
+    project: critiqued,
+    result: finalResult,
+    critique,
+  } = await critiqueAndRefine(
     afterRun,
     parent.inputs.brief,
     discovery,
     result,
     deps,
-    regeneration,
+    instruction ? [instruction] : [],
   );
-  const updated = await saveCandidate(afterRun, candidate, deps);
+  const candidate = buildEnrichedCandidate(
+    critiqued,
+    parent.inputs.brief,
+    discovery,
+    finalResult,
+    deps,
+    regeneration,
+    critique,
+  );
+  const updated = await saveCandidate(critiqued, candidate, deps);
   return { project: updated, candidate };
 };

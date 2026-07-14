@@ -28,7 +28,23 @@ export interface CandidateView {
     readonly scopeLabel: string;
     readonly instruction?: string;
   };
+  /** The self-critique verdict, flattened for display. */
+  readonly critique?: {
+    readonly verdict: "strong" | "needs-refinement";
+    /** e.g. "Self-critique: strong" or "Self-critique: refined after 2 findings" */
+    readonly headline: string;
+    readonly summary: string;
+    readonly findings: readonly { readonly detail: string; readonly fix: string }[];
+  };
 }
+
+const critiqueHeadline = (critique: NonNullable<Candidate["critique"]>): string => {
+  if (critique.verdict === "strong") return "Self-critique: strong";
+  const count = critique.findings.length;
+  return critique.refined
+    ? `Self-critique: refined after ${count} finding${count === 1 ? "" : "s"}`
+    : `Self-critique: ${count} finding${count === 1 ? "" : "s"} (refine did not run)`;
+};
 
 export const toCandidateView = (candidate: Candidate): CandidateView => ({
   id: candidate.id,
@@ -54,6 +70,19 @@ export const toCandidateView = (candidate: Candidate): CandidateView => ({
           scope: candidate.regeneration.scope,
           scopeLabel: REGENERATION_SCOPE_LABELS[candidate.regeneration.scope],
           instruction: candidate.regeneration.instruction,
+        },
+      }
+    : {}),
+  ...(candidate.critique
+    ? {
+        critique: {
+          verdict: candidate.critique.verdict,
+          headline: critiqueHeadline(candidate.critique),
+          summary: candidate.critique.summary,
+          findings: candidate.critique.findings.map((finding) => ({
+            detail: finding.detail,
+            fix: finding.fix,
+          })),
         },
       }
     : {}),

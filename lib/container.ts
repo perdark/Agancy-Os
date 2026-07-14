@@ -7,6 +7,7 @@ import {
   type Clock,
   type DiscoveryGenerator,
   type EvidenceExtractor,
+  type KitCritic,
   type ProjectRepository,
   type PrototypeGenerator,
   type StageContext,
@@ -25,6 +26,8 @@ import {
   ClaudeEvidenceExtractor,
   NullEvidenceExtractor,
 } from "./ai/claude-evidence-extractor";
+import { ClaudeKitCritic, NullKitCritic } from "./ai/claude-kit-critic";
+import { CliKitCritic } from "./ai/cli-kit-critic";
 import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
 import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
@@ -84,6 +87,13 @@ export interface Container {
    * machine-read.
    */
   readonly evidenceExtractor: EvidenceExtractor;
+  /**
+   * The self-critique pass (Engine 1: "critiques itself"). Text-only, so
+   * both api and cli run it; placeholder binds the null critic. The
+   * operator can disable it with `AGENCY_CRITIQUE=off` (skips the second
+   * generation pass entirely).
+   */
+  readonly kitCritic: KitCritic;
 }
 
 /**
@@ -93,6 +103,20 @@ export interface Container {
  */
 const resolveAssetDir = (): string =>
   process.env.AGENCY_ASSET_DIR?.trim() || join(process.cwd(), ".data", "assets");
+
+const buildKitCritic = (backend: AiBackend): KitCritic => {
+  if (process.env.AGENCY_CRITIQUE?.trim().toLowerCase() === "off") {
+    return new NullKitCritic();
+  }
+  switch (backend) {
+    case "api":
+      return new ClaudeKitCritic();
+    case "cli":
+      return new CliKitCritic();
+    case "placeholder":
+      return new NullKitCritic();
+  }
+};
 
 const buildGenerators = (
   backend: AiBackend,
@@ -143,6 +167,7 @@ export const getContainer = (): Container => {
       aiBackend === "api"
         ? new ClaudeEvidenceExtractor()
         : new NullEvidenceExtractor(),
+    kitCritic: buildKitCritic(aiBackend),
   };
 
   return container;

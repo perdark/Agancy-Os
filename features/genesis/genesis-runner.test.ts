@@ -4,6 +4,9 @@ import {
   type DiscoveryGenerator,
   type DiscoveryOutput,
   type GenesisInput,
+  type KitCritic,
+  type KitCritiqueRequest,
+  type KitCritiqueResult,
   type Project,
   type ProjectId,
   type ProjectRepository,
@@ -297,6 +300,217 @@ describe("runGenesisDraftFirst", () => {
     expect(persisted?.workflow.runs.discovery?.status).toBe("complete");
     expect(persisted?.workflow.results.discovery).toBeDefined();
     expect(persisted?.workflow.runs.prototype?.status).toBe("failed");
+  });
+});
+
+describe("facts-first generation", () => {
+  const extraction = (project: Project): Project => ({
+    ...project,
+    extractions: [
+      {
+        id: "ext-1" as Project["extractions"][number]["id"],
+        facts: [
+          {
+            id: "fact-1",
+            category: "price",
+            statement: "A cappuccino costs 3,000 IQD.",
+            provenance: "verified",
+            citations: [],
+          },
+        ],
+        examinedAssetIds: [],
+        backend: "api",
+        extractedAt: new Date(0),
+      },
+    ],
+  });
+
+  it("extracts facts before the stages and feeds them into the prototype", async () => {
+    const { deps, prototypeCalls } = makeDeps();
+    let calls = 0;
+    const withFacts: GenesisRunnerDeps = {
+      ...deps,
+      ensureFacts: async (project) => {
+        calls += 1;
+        return extraction(project);
+      },
+    };
+
+    const { project } = await runGenesisDraftFirst(input, withFacts);
+
+    expect(calls).toBe(1);
+    expect(project.extractions).toHaveLength(1);
+    expect(prototypeCalls[0]?.options?.facts?.[0]?.statement).toBe(
+      "A cappuccino costs 3,000 IQD.",
+    );
+  });
+
+  it("does not re-extract on resume when an extraction already exists", async () => {
+    const { deps } = makeDeps();
+    let calls = 0;
+    const withFacts: GenesisRunnerDeps = {
+      ...deps,
+      ensureFacts: async (project) => {
+        calls += 1;
+        return extraction(project);
+      },
+    };
+
+    const { project } = await runGenesisDraftFirst(input, withFacts);
+    await resumeGenesisRun(project.id, withFacts);
+
+    expect(calls).toBe(1);
+  });
+
+  it("a failed extraction never blocks generation — the run completes without facts", async () => {
+    const { deps, prototypeCalls } = makeDeps();
+    const failing: GenesisRunnerDeps = {
+      ...deps,
+      ensureFacts: async () => {
+        throw new Error("vision transport exploded");
+      },
+    };
+
+    const { project } = await runGenesisDraftFirst(input, failing);
+
+    expect(project.workflow.runs.prototype?.status).toBe("complete");
+    expect(project.extractions).toHaveLength(0);
+    expect(prototypeCalls[0]?.options?.facts).toBeUndefined();
+  });
+});
+
+describe("self-critique (Engine 1)", () => {
+  const criticOf = (
+    result: KitCritiqueResult | null,
+  ): KitCritic & { requests: KitCritiqueRequest[] } => {
+    const requests: KitCritiqueRequest[] = [];
+    return {
+      requests,
+      async critique(request) {
+        requests.push(request);
+        return result;
+      },
+    };
+  };
+
+  const needsRefinement: KitCritiqueResult = {
+    verdict: "needs-refinement",
+    findings: [
+      {
+        category: "unsupported-claim",
+        detail: "The hero promises delivery.",
+        fix: "Remove the delivery promise.",
+      },
+      {
+        category: "generic-element",
+        detail: "The About screen fits any cafe.",
+        fix: "Ground the About screen in the college-gate location.",
+      },
+    ],
+    summary: "Two real issues.",
+    model: "claude-sonnet-5",
+    promptId: "prototype.self-critic",
+    promptVersion: "0.1.0",
+    promptHash: "c".repeat(64),
+  };
+
+  it("a strong verdict stores the critique without a second generation pass", async () => {
+    const { deps, prototypeCalls } = makeDeps();
+    const critic = criticOf({
+      verdict: "strong",
+      findings: [],
+      summary: "Kit is specific and truthful.",
+    });
+
+    const { project } = await runGenesisDraftFirst(input, {
+      ...deps,
+      kitCritic: critic,
+    });
+
+    expect(critic.requests).toHaveLength(1);
+    expect(prototypeCalls).toHaveLength(1);
+    const enriched = project.candidates.find(
+      (candidate) => candidate.approach === "evidence-enriched",
+    );
+    expect(enriched?.critique).toMatchObject({
+      verdict: "strong",
+      refined: false,
+      backend: "cli",
+    });
+  });
+
+  it("needs-refinement buys exactly one refine pass with the fixes as directives", async () => {
+    const { deps, prototypeCalls, repository } = makeDeps();
+
+    const { project } = await runGenesisDraftFirst(input, {
+      ...deps,
+      kitCritic: criticOf(needsRefinement),
+    });
+
+    expect(prototypeCalls).toHaveLength(2);
+    expect(prototypeCalls[1]?.options?.directives).toEqual([
+      "Remove the delivery promise.",
+      "Ground the About screen in the college-gate location.",
+    ]);
+    const enriched = project.candidates.find(
+      (candidate) => candidate.approach === "evidence-enriched",
+    );
+    expect(enriched?.critique).toMatchObject({
+      verdict: "needs-refinement",
+      refined: true,
+      promptId: "prototype.self-critic",
+    });
+    // The refine ran through the persisted lifecycle: attempts incremented.
+    const persisted = await repository.findById(project.id);
+    expect(persisted?.workflow.runs.prototype?.attempts).toBe(2);
+  });
+
+  it("a failed critique keeps the un-critiqued kit and completes the run", async () => {
+    const { deps, prototypeCalls } = makeDeps();
+    const exploding: KitCritic = {
+      async critique() {
+        throw new Error("critic transport exploded");
+      },
+    };
+
+    const { project } = await runGenesisDraftFirst(input, {
+      ...deps,
+      kitCritic: exploding,
+    });
+
+    expect(prototypeCalls).toHaveLength(1);
+    const enriched = project.candidates.find(
+      (candidate) => candidate.approach === "evidence-enriched",
+    );
+    expect(enriched).toBeDefined();
+    expect(enriched?.critique).toBeUndefined();
+  });
+
+  it("entire regeneration critiques the new kit and keeps the operator's instruction in the refine", async () => {
+    const { deps, prototypeCalls } = makeDeps();
+    const first = await runGenesisDraftFirst(input, deps);
+    const parent = first.project.candidates.find(
+      (candidate) => candidate.approach === "evidence-enriched",
+    )!;
+
+    const { candidate } = await regenerateCandidateRun(
+      {
+        projectId: first.project.id,
+        candidateId: parent.id,
+        scope: "entire",
+        instruction: "Bookings happen by phone.",
+      },
+      { ...deps, kitCritic: criticOf(needsRefinement) },
+    );
+
+    // initial + regeneration + refine = 3 prototype calls.
+    expect(prototypeCalls).toHaveLength(3);
+    expect(prototypeCalls[2]?.options?.directives).toEqual([
+      "Bookings happen by phone.",
+      "Remove the delivery promise.",
+      "Ground the About screen in the college-gate location.",
+    ]);
+    expect(candidate.critique?.refined).toBe(true);
   });
 });
 

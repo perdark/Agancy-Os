@@ -3,6 +3,42 @@
 **Date:** 2026-07-14 (Claude/Fable 5)
 **Branch:** `claude/agency-os-development-8mb5wv`
 
+## Update 2026-07-14 (later) — Engine 1 strengthened: self-critique + facts-first
+
+The owner asked about Engine 2 and chose to stick to the vision: strengthen
+Engine 1 instead. Two slices landed:
+
+**Facts-first generation.** The genesis runner now extracts source facts
+BEFORE the stages run (`ensureFacts` hook, bound in
+`features/genesis/service.ts` to the existing `extractEvidenceFacts`
+use-case), so the FIRST candidates are grounded without a manual click.
+Non-fatal by design: a failed extraction logs and generation proceeds. The
+manual "Extract facts" button remains for re-extraction.
+
+**Self-critique + one refine pass** (vision: "iterates, critiques itself").
+New `KitCritic` port (`packages/domain/genesis/kit-critic.ts`) with prompt
+`prototype.self-critic@0.1.0`: an adversarial review of the generated kit
+against the brief and fact base — any-other-shop test per screen,
+unsupported specifics vs the fact list, buyer-fit, weak screens. Verdict
+`strong` stores the critique as-is; `needs-refinement` triggers exactly ONE
+refine pass through the persisted stage lifecycle (attempts increments),
+with the findings' fixes as directives (an operator's regeneration
+instruction is preserved ahead of them). Text-only, so BOTH transports run
+it (`lib/ai/claude-kit-critic.ts`, `lib/ai/cli-kit-critic.ts`, shared
+`critic-codec.ts`); placeholder binds `NullKitCritic`; `AGENCY_CRITIQUE=off`
+disables it. The candidate stores `critique` (verdict, findings, summary,
+backend/model/prompt provenance, `refined`) — codec + fixture + PGlite
+round-trip extended; the candidates card shows an expandable
+"Self-critique" line. Failure paths are all non-fatal: the operator always
+gets a kit — critiqued, refined, or honestly un-critiqued.
+
+**Verification:** 243 tests pass (13 new), typecheck, lint zero warnings,
+production build. NOT browser-tested (owner does that on the laptop):
+watch for the critique line on new candidates, attempts=2 on refined runs,
+and generation time roughly doubling when a refine pass fires (CLI).
+
+---
+
 ## Update 2026-07-14 — Step 3 fact-extraction DONE; vision recorded
 
 **Step 3 is now fully DONE.** The last open items — source facts with

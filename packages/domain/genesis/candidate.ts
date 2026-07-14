@@ -3,6 +3,7 @@ import type { StageResult } from "../workflow/stage-result";
 import { buildClaudeDesignPackage } from "./claude-design-package";
 import type { DiscoveryOutput } from "./discovery-output";
 import type { GenesisInput } from "./genesis-input";
+import type { CandidateCritique } from "./kit-critic";
 import type { ClaudeDesignPrompt } from "./prototype-output";
 
 /**
@@ -88,6 +89,8 @@ export interface Candidate {
   readonly inputs: CandidateInputs;
   /** Present when this candidate revises another one. */
   readonly regeneration?: CandidateRegeneration;
+  /** The self-critique that reviewed (and possibly refined) this kit. */
+  readonly critique?: CandidateCritique;
   readonly createdAt: Date;
 }
 

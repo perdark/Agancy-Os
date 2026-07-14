@@ -221,6 +221,23 @@ export const buildMaximalProject = (): Project => {
           scope: "assumption",
           instruction: "The audience is college staff, not students.",
         },
+        critique: {
+          verdict: "needs-refinement",
+          findings: [
+            {
+              category: "unsupported-claim",
+              detail: "The hero shows delivery, which no evidence supports.",
+              fix: "Remove the delivery promise; frame it as an open question.",
+            },
+          ],
+          summary: "Solid direction with one fabricated capability.",
+          backend: "cli",
+          model: "claude-sonnet-5",
+          promptId: "prototype.self-critic",
+          promptVersion: "0.1.0",
+          promptHash: "f".repeat(64),
+          refined: true,
+        },
         createdAt: t(34),
       },
     ],

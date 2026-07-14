@@ -10,6 +10,7 @@ import {
 } from "@/domain";
 import { hashPrompt } from "@/lib/ai/prompt-hash";
 import { getContainer } from "@/lib/container";
+import { extractEvidenceFacts } from "@/features/projects/extract-facts";
 import {
   regenerateCandidateRun,
   resumeGenesisRun,
@@ -35,8 +36,16 @@ export interface GenesisResult {
  * failed or interrupted generation is a resumable project — not lost work.
  */
 const runnerDeps = (): GenesisRunnerDeps => {
-  const { projects, discoveryGenerator, prototypeGenerator, context, aiBackend } =
-    getContainer();
+  const {
+    projects,
+    discoveryGenerator,
+    prototypeGenerator,
+    context,
+    aiBackend,
+    assetStorage,
+    evidenceExtractor,
+    kitCritic,
+  } = getContainer();
   return {
     projects,
     discoveryGenerator,
@@ -45,6 +54,23 @@ const runnerDeps = (): GenesisRunnerDeps => {
     clock: context.clock,
     aiBackend,
     hashText: hashPrompt,
+    kitCritic,
+    // Facts-first generation (Engine 1): the runner calls this before the
+    // stages so the first candidates are grounded in extracted facts.
+    ensureFacts: async (project) => {
+      const { project: updated } = await extractEvidenceFacts(
+        { projectId: project.id },
+        {
+          projects,
+          assetStorage,
+          extractor: evidenceExtractor,
+          extractorBackend: aiBackend,
+          ids: context.ids,
+          clock: context.clock,
+        },
+      );
+      return updated;
+    },
   };
 };
 

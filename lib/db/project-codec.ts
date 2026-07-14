@@ -9,6 +9,8 @@ import {
   asOutcomeId,
   asProjectId,
   ASSET_SOURCES,
+  CRITIQUE_FINDING_CATEGORIES,
+  CRITIQUE_VERDICTS,
   FACT_CATEGORIES,
   FACT_PROVENANCES,
   PRICE_LEVELS,
@@ -155,6 +157,25 @@ const candidate = z.object({
       parentId: z.string().transform(asCandidateId),
       scope: z.enum(REGENERATION_SCOPES),
       instruction: z.string().optional(),
+    })
+    .optional(),
+  critique: z
+    .object({
+      verdict: z.enum(CRITIQUE_VERDICTS),
+      findings: z.array(
+        z.object({
+          category: z.enum(CRITIQUE_FINDING_CATEGORIES),
+          detail: z.string(),
+          fix: z.string(),
+        }),
+      ),
+      summary: z.string(),
+      backend: z.string(),
+      model: z.string().optional(),
+      promptId: z.string().optional(),
+      promptVersion: z.string().optional(),
+      promptHash: z.string().optional(),
+      refined: z.boolean(),
     })
     .optional(),
   createdAt: date,
