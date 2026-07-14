@@ -102,17 +102,20 @@ export class ClaudeEvidenceExtractor implements EvidenceExtractor {
           statement: fact.statement,
           provenance: fact.provenance,
           basis: fact.basis,
-          citations: fact.citations
-            .filter((citation) => citation.document <= readable.length)
-            .map((citation) => ({
-              // The prompt numbers documents 1..N in attachment order, and
-              // `readable` IS that order — but the caller cites into the
-              // original documents array, so map through the readable list.
-              documentIndex: request.documents.indexOf(
-                readable[citation.document - 1],
-              ),
-              detail: citation.detail,
-            })),
+          // The prompt numbers documents 1..N in attachment order, and
+          // `readable` IS that order — but the caller cites into the
+          // original documents array, so map through the readable list.
+          citations: fact.citations.flatMap((citation) => {
+            const document = readable[citation.document - 1];
+            return document
+              ? [
+                  {
+                    documentIndex: request.documents.indexOf(document),
+                    detail: citation.detail,
+                  },
+                ]
+              : [];
+          }),
         })),
         model: response?.modelId ?? EXTRACTOR_MODEL,
         promptId: evidenceExtractionPrompt.id,

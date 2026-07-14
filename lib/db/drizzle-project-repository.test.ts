@@ -50,7 +50,7 @@ describe("DrizzleProjectRepository (PGlite)", () => {
     expect(loaded?.workflow.runs.prototype?.diagnostics?.error).toBe(
       "The claude CLI call failed before returning a result.",
     );
-    expect(loaded?.history).toHaveLength(8);
+    expect(loaded?.history).toHaveLength(9);
     // Candidates round-trip with revived Dates and their Discovery snapshot.
     expect(loaded?.candidates).toHaveLength(2);
     expect(loaded?.candidates[1]?.createdAt).toBeInstanceOf(Date);
@@ -67,6 +67,13 @@ describe("DrizzleProjectRepository (PGlite)", () => {
     expect(loaded?.outcomes).toHaveLength(1);
     expect(loaded?.outcomes[0]?.deal).toBe("won");
     expect(loaded?.outcomes[0]?.recordedAt).toBeInstanceOf(Date);
+    // The extraction survives with revived Dates, branded ids, and citations.
+    expect(loaded?.extractions).toHaveLength(1);
+    expect(loaded?.extractions[0]?.extractedAt).toBeInstanceOf(Date);
+    expect(loaded?.extractions[0]?.facts[0]?.citations[0]?.assetId).toBe(
+      "asset-1",
+    );
+    expect(loaded?.extractions[0]?.examinedAssetIds).toEqual(["asset-1"]);
   });
 
   it("upserts on save so run-state transitions overwrite the same row", async () => {

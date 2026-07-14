@@ -45,6 +45,7 @@ export const projects = pgTable("projects", {
   candidates: jsonb("candidates").notNull().default([]),
   artifacts: jsonb("artifacts").notNull().default([]),
   outcomes: jsonb("outcomes").notNull().default([]),
+  extractions: jsonb("extractions").notNull().default([]),
   documents: jsonb("documents").notNull(),
   assets: jsonb("assets").notNull(),
   history: jsonb("history").notNull(),

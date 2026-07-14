@@ -230,9 +230,14 @@ real Postgres engine.
 
 ### Step 3: Build the minimal evidence intake
 
-**Status: Intake and asset storage DONE — 2026-07-11** (browser-verified:
-upload → previews → stored bytes under `.data/` → served back through the
-asset route). Evidence fact-extraction with citations remains open.
+**Status: DONE — 2026-07-14.** Intake and asset storage were browser-verified
+2026-07-11 (upload → previews → stored bytes under `.data/` → served back
+through the asset route). Fact extraction with citations landed 2026-07-14:
+`SourceFact` provenance model with the verified-requires-citation sanitizer,
+the `EvidenceExtractor` vision port (API transport reads real bytes;
+cli/placeholder honestly record operator-only extractions), the Source facts
+card, and the facts feed into the Prototype prompt (v0.3.0). Unit-verified;
+browser verification is with the owner.
 
 - [x] Replace the six-field-first experience with:
   - Business name or profile.
@@ -242,8 +247,8 @@ asset route). Evidence fact-extraction with citations remains open.
 - [x] Keep structured business fields as optional refinement.
 - [x] Store real asset bytes through an asset-storage port.
 - [x] Preserve asset kind, MIME type, checksum, source, and display preview.
-- [ ] Extract source facts with citations back to the uploaded evidence.
-- [ ] Mark every derived statement as `verified`, `operator-provided`, or
+- [x] Extract source facts with citations back to the uploaded evidence.
+- [x] Mark every derived statement as `verified`, `operator-provided`, or
   `hypothesis`.
 
 ### Step 4: Generate candidate directions
@@ -426,6 +431,10 @@ Before implementing a task, an AI agent must read:
 2. `ARCHITECTURE.md`
 3. `HANDOFF.md`
 4. The relevant feature specification and tests
+
+`docs/VISION.md` holds the long-term engine roadmap (Engine 1 — the Deep
+Creative Engine — is the only current priority); read it for direction, but
+this guide wins on what to build now.
 
 The agent must then:
 

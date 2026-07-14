@@ -4,10 +4,13 @@ import {
   asAssetId,
   asCandidateId,
   asDocumentId,
+  asExtractionId,
   asHistoryEventId,
   asOutcomeId,
   asProjectId,
   ASSET_SOURCES,
+  FACT_CATEGORIES,
+  FACT_PROVENANCES,
   PRICE_LEVELS,
   readinessScore,
   REGENERATION_SCOPES,
@@ -238,6 +241,38 @@ const outcomes = z
   .nullish()
   .transform((value) => value ?? []);
 
+const sourceFact = z.object({
+  id: z.string(),
+  category: z.enum(FACT_CATEGORIES),
+  statement: z.string(),
+  provenance: z.enum(FACT_PROVENANCES),
+  citations: z.array(
+    z.object({
+      assetId: z.string().transform(asAssetId),
+      detail: z.string(),
+    }),
+  ),
+  basis: z.string().optional(),
+});
+
+const extraction = z.object({
+  id: z.string().transform(asExtractionId),
+  facts: z.array(sourceFact),
+  examinedAssetIds: z.array(z.string().transform(asAssetId)),
+  backend: z.string(),
+  model: z.string().optional(),
+  promptId: z.string().optional(),
+  promptVersion: z.string().optional(),
+  promptHash: z.string().optional(),
+  extractedAt: date,
+});
+
+/** Rows written before fact extraction existed have none; default them. */
+const extractions = z
+  .array(extraction)
+  .nullish()
+  .transform((value) => value ?? []);
+
 /** Rows written before artifact import existed have none; default them. */
 const artifacts = z
   .array(artifact)
@@ -301,6 +336,14 @@ const historyEvent = z.discriminatedUnion("type", [
     type: z.literal("outcome.recorded"),
     outcomeId: z.string(),
     deal: z.string(),
+    at: date,
+  }),
+  z.object({
+    id: z.string().transform(asHistoryEventId),
+    type: z.literal("evidence.extracted"),
+    extractionId: z.string(),
+    facts: z.number().int().nonnegative(),
+    verified: z.number().int().nonnegative(),
     at: date,
   }),
 ]);
@@ -385,6 +428,7 @@ export const toProjectRow = (project: Project): NewProjectRow => ({
   candidates: project.candidates,
   artifacts: project.artifacts,
   outcomes: project.outcomes,
+  extractions: project.extractions,
   documents: project.documents,
   assets: project.assets,
   history: project.history,
@@ -424,6 +468,7 @@ export const toProject = (row: ProjectRow): Project => {
     candidates: candidates.parse(row.candidates) as Project["candidates"],
     artifacts: artifacts.parse(row.artifacts),
     outcomes: outcomes.parse(row.outcomes),
+    extractions: extractions.parse(row.extractions),
     documents: document.array().parse(row.documents),
     assets: asset.array().parse(row.assets),
     history: historyEvent.array().parse(row.history),

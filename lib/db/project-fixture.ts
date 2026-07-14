@@ -3,6 +3,7 @@ import {
   asAssetId,
   asCandidateId,
   asDocumentId,
+  asExtractionId,
   asHistoryEventId,
   asOutcomeId,
   asProjectId,
@@ -274,6 +275,37 @@ export const buildMaximalProject = (): Project => {
         recordedAt: t(40),
       },
     ],
+    extractions: [
+      {
+        id: asExtractionId("ext-1"),
+        facts: [
+          {
+            id: "fact-1",
+            category: "price",
+            statement: "A cappuccino costs 3,000 IQD.",
+            provenance: "verified",
+            citations: [
+              { assetId: asAssetId("asset-1"), detail: "menu photo, row 2" },
+            ],
+          },
+          {
+            id: "fact-2",
+            category: "audience",
+            statement: "Students study there in the afternoon.",
+            provenance: "hypothesis",
+            citations: [],
+            basis: "Study-corner photos on the profile.",
+          },
+        ],
+        examinedAssetIds: [asAssetId("asset-1")],
+        backend: "api",
+        model: "claude-sonnet-5",
+        promptId: "evidence.fact-extraction",
+        promptVersion: "0.1.0",
+        promptHash: "d".repeat(64),
+        extractedAt: t(42),
+      },
+    ],
     documents: [
       {
         id: asDocumentId("doc-1"),
@@ -378,8 +410,16 @@ export const buildMaximalProject = (): Project => {
         deal: "won",
         at: t(40),
       },
+      {
+        id: asHistoryEventId("h-9"),
+        type: "evidence.extracted",
+        extractionId: "ext-1",
+        facts: 2,
+        verified: 1,
+        at: t(42),
+      },
     ],
     createdAt: t(0),
-    updatedAt: t(40),
+    updatedAt: t(42),
   };
 };

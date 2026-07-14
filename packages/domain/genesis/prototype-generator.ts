@@ -1,3 +1,4 @@
+import type { SourceFact } from "../project/facts";
 import type { StageContext } from "../workflow/stage";
 import type { StageResult } from "../workflow/stage-result";
 import type { DiscoveryOutput } from "./discovery-output";
@@ -31,4 +32,11 @@ export interface PrototypeGenerator {
  */
 export interface PrototypeGenerationOptions {
   readonly directives?: readonly string[];
+  /**
+   * Source facts from the latest evidence extraction (guide Step 3). The
+   * prompt grounds every screen in these instead of letting the model
+   * re-imagine the prospect: verified facts are used verbatim, hypotheses
+   * stay marked as assumptions.
+   */
+  readonly facts?: readonly SourceFact[];
 }

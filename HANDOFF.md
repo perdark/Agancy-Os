@@ -1,8 +1,66 @@
 # HANDOFF — session state
 
-**Date:** 2026-07-11 (Claude/Fable 5; owner continuing from mobile)
-**Branch:** `claude/step-4-project-5d8iqp` (continues from
-`claude/agency-os-foundation-gr9yso`)
+**Date:** 2026-07-14 (Claude/Fable 5)
+**Branch:** `claude/agency-os-development-8mb5wv`
+
+## Update 2026-07-14 — Step 3 fact-extraction DONE; vision recorded
+
+**Step 3 is now fully DONE.** The last open items — source facts with
+citations, every statement marked `verified` / `operator-provided` /
+`hypothesis` — are implemented end to end:
+
+- **Domain** (`packages/domain/project/facts.ts`): `SourceFact` +
+  `EvidenceExtraction` (append-only on the project). The invariant lives in
+  `sanitizeExtractedFacts`: a `verified` claim survives only with a citation
+  into evidence that was actually examined — otherwise it is demoted to
+  `hypothesis` with the demotion named. `deriveOperatorFacts` records the
+  brief's own statements deterministically (no AI).
+- **Port + transports**: `EvidenceExtractor`
+  (`packages/domain/project/evidence-extractor.ts`); the API transport
+  (`lib/ai/claude-evidence-extractor.ts`, `claude-sonnet-5`) attaches real
+  evidence bytes (images as image parts, PDFs as file parts) after versioned
+  prompt `evidence.fact-extraction@0.1.0` and maps document-number citations
+  back to assets. cli/placeholder bind `NullEvidenceExtractor`: the stored
+  extraction then has empty `examinedAssetIds` and only operator facts —
+  honest, like the Step 6 judge.
+- **Slice**: `extractEvidenceFacts` use-case, `extractProjectFacts` action,
+  "Source facts" card on the project screen (provenance badges, citations
+  linking to the asset previews, provenance footer, amber note when the
+  evidence was not machine-read).
+- **Persistence**: `extractions` JSONB column
+  (`drizzle/0004_colorful_luckman.sql`), codec with Date revival + legacy
+  default `[]`, PGlite round-trip extended, history event
+  `evidence.extracted`.
+- **Generation feed**: `prototype.first-meeting-kit` is now **v0.3.0** — a
+  SOURCE FACTS section separates VERIFIED (use verbatim, with citation
+  details) / OPERATOR-PROVIDED / HYPOTHESES. The genesis runner passes the
+  latest extraction's facts into Prototype runs and `entire` regenerations.
+  The thin baseline stays untouched (the Khatuna control).
+- **Vision recorded**: `docs/VISION.md` — the three-engine roadmap. Engine 1
+  (Deep Creative Engine, the first-meeting loop) is the ONLY current
+  priority; Engines 2–3 and the Memory/Evolution/Growth/Failure ideas are
+  explicitly do-not-build-yet. Pointers added in the guide §10 and
+  PRODUCT.md.
+
+**Verification performed:** 230 tests pass (20 new: sanitizer/operator facts,
+extraction prompt, use-case incl. demotion + null-extractor honesty +
+append-only re-extraction, prompt v0.3.0 facts section, codec/PGlite
+round-trips), typecheck, lint zero warnings, production build.
+
+**Owner's browser checklist (laptop, by their choice):** intake with logo +
+evidence → "Extract facts from evidence" on the project page (API backend
+for real extraction; cli shows the honest operator-only note) → facts card
+shows verified-with-citations vs hypotheses → regenerate a candidate with
+scope "entire" → the new package contains the SOURCE FACTS section. Then the
+full Lotus Cafe acceptance run (Steps 5–8 remain browser-untested too).
+
+**Remaining gaps:** Step 0 benchmark materials (blocked on owner);
+extraction is operator-triggered, not yet automatic during intake;
+durability on a real Postgres server still undemonstrated (PGlite only).
+
+---
+
+*Previous handoff (2026-07-11, branch `claude/step-4-project-5d8iqp`):*
 
 ## Update 2026-07-11 (final) — Steps 6, 7, 8 built; owner will test
 

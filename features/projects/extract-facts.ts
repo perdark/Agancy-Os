@@ -105,16 +105,12 @@ export const extractEvidenceFacts = async (
       statement: fact.statement,
       provenance: fact.provenance,
       basis: fact.basis,
-      citations: fact.citations
-        .filter(
-          (citation) =>
-            citation.documentIndex >= 0 &&
-            citation.documentIndex < documents.length,
-        )
-        .map((citation) => ({
-          assetId: documents[citation.documentIndex].assetId,
-          detail: citation.detail,
-        })),
+      citations: fact.citations.flatMap((citation) => {
+        const document = documents[citation.documentIndex];
+        return document
+          ? [{ assetId: document.assetId, detail: citation.detail }]
+          : [];
+      }),
     }),
   );
 

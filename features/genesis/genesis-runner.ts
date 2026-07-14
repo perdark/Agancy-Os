@@ -8,6 +8,7 @@ import {
   completeStageRun,
   createProject,
   failStageRun,
+  latestExtraction,
   needsStageRun,
   queueStageRun,
   rebuildBrief,
@@ -189,12 +190,22 @@ const executeGenesisStages = async (
   let prototypeRan = false;
   if (needsStageRun(project.workflow, "prototype") || !prototypeResult) {
     const savedDiscovery = discoveryResult;
+    // Ground the kit in the newest extracted source facts, when they exist.
+    const facts = latestExtraction(project.extractions)?.facts;
+    const options: PrototypeGenerationOptions | undefined = facts
+      ? { facts }
+      : undefined;
     ({ project, result: prototypeResult } = await runPersistedStage(
       project,
       "prototype",
       deps,
       (context) =>
-        deps.prototypeGenerator.generate(input, savedDiscovery, context),
+        deps.prototypeGenerator.generate(
+          input,
+          savedDiscovery,
+          context,
+          options,
+        ),
     ));
     prototypeRan = true;
   }
@@ -503,9 +514,16 @@ export const regenerateCandidateRun = async (
     );
   }
 
-  const options: PrototypeGenerationOptions | undefined = instruction
-    ? { directives: [instruction] }
-    : undefined;
+  // Regeneration is grounded in the newest facts too — a correction should
+  // never cost the run its evidence.
+  const facts = latestExtraction(project.extractions)?.facts;
+  const options: PrototypeGenerationOptions | undefined =
+    instruction || facts
+      ? {
+          ...(instruction ? { directives: [instruction] } : {}),
+          ...(facts ? { facts } : {}),
+        }
+      : undefined;
   const queued: Project = {
     ...project,
     workflow: queueStageRun(project.workflow, "prototype", deps.clock.now()),

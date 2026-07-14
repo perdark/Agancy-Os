@@ -19,7 +19,8 @@ a prospect, generate candidate directions, judge the rendered artifacts, and
 present the strongest truthful mockup. Success is a stored, independently
 checked, meeting-ready artifact that demonstrates understanding and improves
 the chance of winning the deal; prompts and strategy are supporting material,
-not the value event.
+not the value event. This is Engine 1 of the long-term engine roadmap in
+`docs/VISION.md`; the later engines wait until Engine 1 wins real meetings.
 
 ## Brand Personality
 

@@ -16,6 +16,12 @@ const sequentialIds = (): IdGenerator => {
   return { next: () => `id-${++n}` };
 };
 
+const only = <T,>(items: readonly T[]): T => {
+  const [item] = items;
+  if (item === undefined) throw new Error("expected one item");
+  return item;
+};
+
 const examined = [asAssetId("asset-1"), asAssetId("asset-2")];
 
 const draft = (
@@ -30,52 +36,56 @@ const draft = (
 
 describe("sanitizeExtractedFacts", () => {
   it("keeps a verified fact whose citation points into the examined evidence", () => {
-    const [fact] = sanitizeExtractedFacts([draft()], examined, sequentialIds());
+    const fact = only(sanitizeExtractedFacts([draft()], examined, sequentialIds()));
     expect(fact.provenance).toBe("verified");
     expect(fact.citations).toHaveLength(1);
   });
 
   it("demotes a verified fact with no citations to a hypothesis and says why", () => {
-    const [fact] = sanitizeExtractedFacts(
-      [draft({ citations: [] })],
-      examined,
-      sequentialIds(),
+    const fact = only(
+      sanitizeExtractedFacts([draft({ citations: [] })], examined, sequentialIds()),
     );
     expect(fact.provenance).toBe("hypothesis");
     expect(fact.basis).toMatch(/demoted from verified/i);
   });
 
   it("drops citations into assets that were never examined, demoting if none survive", () => {
-    const [fact] = sanitizeExtractedFacts(
-      [
-        draft({
-          citations: [
-            { assetId: asAssetId("asset-999"), detail: "not examined" },
-          ],
-        }),
-      ],
-      examined,
-      sequentialIds(),
+    const fact = only(
+      sanitizeExtractedFacts(
+        [
+          draft({
+            citations: [
+              { assetId: asAssetId("asset-999"), detail: "not examined" },
+            ],
+          }),
+        ],
+        examined,
+        sequentialIds(),
+      ),
     );
     expect(fact.citations).toHaveLength(0);
     expect(fact.provenance).toBe("hypothesis");
   });
 
   it("preserves the draft's own basis when demoting", () => {
-    const [fact] = sanitizeExtractedFacts(
-      [draft({ citations: [], basis: "Seen in a story highlight." })],
-      examined,
-      sequentialIds(),
+    const fact = only(
+      sanitizeExtractedFacts(
+        [draft({ citations: [], basis: "Seen in a story highlight." })],
+        examined,
+        sequentialIds(),
+      ),
     );
     expect(fact.basis).toContain("Seen in a story highlight.");
     expect(fact.basis).toMatch(/demoted/i);
   });
 
   it("never upgrades a hypothesis, even when it carries a valid citation", () => {
-    const [fact] = sanitizeExtractedFacts(
-      [draft({ provenance: "hypothesis" })],
-      examined,
-      sequentialIds(),
+    const fact = only(
+      sanitizeExtractedFacts(
+        [draft({ provenance: "hypothesis" })],
+        examined,
+        sequentialIds(),
+      ),
     );
     expect(fact.provenance).toBe("hypothesis");
   });

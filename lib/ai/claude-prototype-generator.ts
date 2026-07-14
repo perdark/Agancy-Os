@@ -50,6 +50,7 @@ export class ClaudePrototypeGenerator implements PrototypeGenerator {
       input,
       discovery,
       directives: options?.directives,
+      facts: options?.facts,
     });
     // Prompt identity is reported before the call so failed runs still carry it.
     context.probe?.report({

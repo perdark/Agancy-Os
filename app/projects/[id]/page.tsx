@@ -9,6 +9,7 @@ import {
 } from "@/domain";
 import { getProject } from "@/features/projects/service";
 import { EvidenceCard } from "@/features/projects/components/evidence-card";
+import { FactsCard } from "@/features/projects/components/facts-card";
 import { HandoffCard } from "@/features/projects/components/handoff-card";
 import { MeetingReadinessCard } from "@/features/projects/components/meeting-readiness-card";
 import { MockupCard } from "@/features/projects/components/mockup-card";
@@ -126,6 +127,7 @@ export default async function ProjectDetailPage({
             ) : null}
           </CardContent>
         </Card>
+        <FactsCard project={project} />
         {/* Mockup screenshots live in the Selected mockup card, not the
             evidence locker. */}
         <EvidenceCard

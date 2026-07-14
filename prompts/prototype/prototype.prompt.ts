@@ -5,6 +5,7 @@ import {
   type DiscoveryOutput,
   type GenesisAssetInput,
   type GenesisInput,
+  type SourceFact,
   type StageResult,
 } from "@/domain";
 import { definePrompt } from "../types";
@@ -15,6 +16,8 @@ export interface PrototypePromptVariables {
   readonly discovery: StageResult<DiscoveryOutput>;
   /** Operator corrections (regeneration) — treated as truth, never debated. */
   readonly directives?: readonly string[];
+  /** Source facts from the latest evidence extraction, when one exists. */
+  readonly facts?: readonly SourceFact[];
 }
 
 /**
@@ -54,13 +57,17 @@ const describeAsset = (asset: GenesisAssetInput): string =>
  * commerce rules are derived per prospect by {@link deriveProspectRules} and
  * each arrives with the trigger in THIS brief that activated it. Operator
  * directives (regeneration corrections) enter as overriding truth.
+ *
+ * v0.3.0: extracted source facts (guide Step 3) ground the kit. Verified
+ * facts arrive with their evidence citations and must be used verbatim;
+ * hypotheses stay marked as assumptions the operator can correct.
  */
 export const prototypePrompt = definePrompt<PrototypePromptVariables>({
   id: "prototype.first-meeting-kit",
-  version: "0.2.0",
+  version: "0.3.0",
   description:
-    "Turn the brief and Discovery's decode into the first-meeting kit: brand assumptions, positioning, prototype direction with world facts, and a ready-to-paste Claude Design prompt. Floor rules are prospect-conditional.",
-  render: ({ input, discovery, directives = [] }) => {
+    "Turn the brief, Discovery's decode, and the extracted source facts into the first-meeting kit: brand assumptions, positioning, prototype direction with world facts, and a ready-to-paste Claude Design prompt. Floor rules are prospect-conditional.",
+  render: ({ input, discovery, directives = [], facts = [] }) => {
     const signals = discovery.output.decodedSignals.map(
       (s) => `  - "${s.clientSaid}" likely means: ${s.likelyMeans} (${s.confidence})`,
     );
@@ -77,6 +84,21 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
     const corrections = directives
       .map((directive) => directive.trim())
       .filter(Boolean);
+    const factLine = (fact: SourceFact): string => {
+      const cited = fact.citations.map((c) => c.detail).filter(Boolean);
+      return `  - [${fact.category}] ${fact.statement}${
+        cited.length > 0 ? ` (seen in: ${cited.join("; ")})` : ""
+      }`;
+    };
+    const verifiedFacts = facts
+      .filter((fact) => fact.provenance === "verified")
+      .map(factLine);
+    const operatorFacts = facts
+      .filter((fact) => fact.provenance === "operator-provided")
+      .map(factLine);
+    const hypotheses = facts
+      .filter((fact) => fact.provenance === "hypothesis")
+      .map(factLine);
     const floor = [
       ...UNIVERSAL_FLOOR.map((rule) => `    - ${rule}`),
       ...deriveProspectRules(input).map(
@@ -116,6 +138,28 @@ export const prototypePrompt = definePrompt<PrototypePromptVariables>({
         ? ["- Standing assumptions:", ...assumptions]
         : []),
       ...(missing.length > 0 ? ["- Known gaps:", ...missing] : []),
+      ...(facts.length > 0
+        ? [
+            "SOURCE FACTS (extracted from the client's real evidence)",
+            ...(verifiedFacts.length > 0
+              ? [
+                  "- VERIFIED — visible in the evidence. Use these verbatim;",
+                  "  never alter names, prices, hours, or wording:",
+                  ...verifiedFacts,
+                ]
+              : []),
+            ...(operatorFacts.length > 0
+              ? ["- OPERATOR-PROVIDED — treat as true:", ...operatorFacts]
+              : []),
+            ...(hypotheses.length > 0
+              ? [
+                  "- HYPOTHESES — unconfirmed. Present them only as marked",
+                  "  assumptions, never as established facts:",
+                  ...hypotheses,
+                ]
+              : []),
+          ]
+        : []),
       ...(corrections.length > 0
         ? [
             "OPERATOR CORRECTIONS (provided truth — override any conflicting",
