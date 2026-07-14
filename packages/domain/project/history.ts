@@ -17,7 +17,8 @@ export type HistoryEvent =
   | CandidateAddedEvent
   | ArtifactImportedEvent
   | ArtifactEvaluatedEvent
-  | OutcomeRecordedEvent;
+  | OutcomeRecordedEvent
+  | EvidenceExtractedEvent;
 
 interface HistoryEventBase {
   readonly id: HistoryEventId;
@@ -73,6 +74,13 @@ export interface OutcomeRecordedEvent extends HistoryEventBase {
   readonly type: "outcome.recorded";
   readonly outcomeId: string;
   readonly deal: string;
+}
+
+export interface EvidenceExtractedEvent extends HistoryEventBase {
+  readonly type: "evidence.extracted";
+  readonly extractionId: string;
+  readonly facts: number;
+  readonly verified: number;
 }
 
 export type HistoryEventType = HistoryEvent["type"];

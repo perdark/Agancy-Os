@@ -16,6 +16,7 @@ export type HistoryEventId = Brand<string, "HistoryEventId">;
 export type CandidateId = Brand<string, "CandidateId">;
 export type ArtifactId = Brand<string, "ArtifactId">;
 export type OutcomeId = Brand<string, "OutcomeId">;
+export type ExtractionId = Brand<string, "ExtractionId">;
 
 export interface IdGenerator {
   next(): string;
@@ -31,3 +32,5 @@ export const asCandidateId = (value: string): CandidateId =>
 export const asArtifactId = (value: string): ArtifactId =>
   value as ArtifactId;
 export const asOutcomeId = (value: string): OutcomeId => value as OutcomeId;
+export const asExtractionId = (value: string): ExtractionId =>
+  value as ExtractionId;

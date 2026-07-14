@@ -13,10 +13,12 @@ import {
   evaluateArtifact,
 } from "./evaluate-artifact";
 import { PROJECTS_PUBLIC_ERROR_MESSAGES } from "./errors";
+import { extractEvidenceFacts, FactExtractionError } from "./extract-facts";
 import { OutcomeRecordError, recordMeetingOutcome } from "./record-outcome";
 import {
   artifactImportFieldsSchema,
   evaluateArtifactSchema,
+  extractFactsSchema,
   mockupScreenshotBatchSchema,
   mockupScreenshotSchema,
   outcomeSchema,
@@ -144,6 +146,47 @@ export const evaluateProjectArtifact = async (values: {
     return {
       ok: false,
       error: PROJECTS_PUBLIC_ERROR_MESSAGES.evaluationFailed,
+    };
+  }
+};
+
+/**
+ * Extract source facts from the project's evidence (guide Step 3). The
+ * extractor transport comes from the container (vision on the API backend;
+ * operator-brief facts only elsewhere, and the stored extraction says so).
+ */
+export const extractProjectFacts = async (values: {
+  projectId: string;
+}): Promise<ArtifactImportActionResult> => {
+  const parsed = extractFactsSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+  }
+
+  try {
+    const { projects, context, assetStorage, evidenceExtractor, aiBackend } =
+      getContainer();
+    const { project } = await extractEvidenceFacts(
+      { projectId: asProjectId(parsed.data.projectId) },
+      {
+        projects,
+        assetStorage,
+        extractor: evidenceExtractor,
+        extractorBackend: aiBackend,
+        ids: context.ids,
+        clock: context.clock,
+      },
+    );
+    revalidatePath(`/projects/${project.id}`);
+    return { ok: true, projectId: project.id };
+  } catch (error) {
+    console.error("Fact extraction failed:", error);
+    if (error instanceof FactExtractionError) {
+      return { ok: false, error: PROJECTS_PUBLIC_ERROR_MESSAGES.invalidInput };
+    }
+    return {
+      ok: false,
+      error: PROJECTS_PUBLIC_ERROR_MESSAGES.extractionFailed,
     };
   }
 };

@@ -10,6 +10,7 @@ import {
   failStageRun,
   needsStageRun,
   queueStageRun,
+  rebuildBrief,
   recordStageResult,
   REGENERATION_SCOPE_LABELS,
   startStageRun,
@@ -158,25 +159,8 @@ export const resumeGenesisRun = async (
 };
 
 /** The brief is fully reconstructible from the aggregate it created. */
-const rebuildGenesisInput = (project: Project): GenesisInput => ({
-  businessName: project.identity.businessName,
-  businessType: project.identity.businessType,
-  market: project.identity.market,
-  country: project.identity.country,
-  audience: project.identity.audience,
-  priceLevel: project.identity.priceLevel,
-  notes: project.identity.notes,
-  assets: project.assets.map((asset) => ({
-    label: asset.label,
-    kind: asset.kind,
-    source: asset.source,
-    uri: asset.uri,
-    mimeType: asset.mimeType,
-    checksum: asset.checksum,
-    sizeBytes: asset.sizeBytes,
-    fileName: asset.fileName,
-  })),
-});
+const rebuildGenesisInput = (project: Project): GenesisInput =>
+  rebuildBrief(project.identity, project.assets);
 
 const executeGenesisStages = async (
   initial: Project,

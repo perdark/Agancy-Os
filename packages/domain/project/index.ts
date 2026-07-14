@@ -10,6 +10,8 @@ export * from "./repository";
 export * from "./artifacts";
 export * from "./artifact-evaluation";
 export * from "./artifact-judge";
+export * from "./facts";
+export * from "./evidence-extractor";
 export * from "./meeting-readiness";
 export * from "./meeting-brief";
 export * from "./outcomes";

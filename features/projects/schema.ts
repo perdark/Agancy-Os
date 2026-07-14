@@ -107,6 +107,10 @@ export const evaluateArtifactSchema = z.object({
   artifactId: requiredText("Artifact id", 64),
 });
 
+export const extractFactsSchema = z.object({
+  projectId: requiredText("Project id", 64),
+});
+
 export const mockupScreenshotBatchSchema = z
   .array(mockupScreenshotSchema)
   .max(

@@ -6,6 +6,7 @@ import {
   type AssetStorage,
   type Clock,
   type DiscoveryGenerator,
+  type EvidenceExtractor,
   type ProjectRepository,
   type PrototypeGenerator,
   type StageContext,
@@ -20,6 +21,10 @@ import {
   ClaudeArtifactJudge,
   NullArtifactJudge,
 } from "./ai/claude-artifact-judge";
+import {
+  ClaudeEvidenceExtractor,
+  NullEvidenceExtractor,
+} from "./ai/claude-evidence-extractor";
 import { ClaudeDiscoveryGenerator } from "./ai/claude-discovery-generator";
 import { ClaudePrototypeGenerator } from "./ai/claude-prototype-generator";
 import { CliDiscoveryGenerator } from "./ai/cli-discovery-generator";
@@ -72,6 +77,13 @@ export interface Container {
    * gate stays honest about being structural-only.
    */
   readonly artifactJudge: ArtifactJudge;
+  /**
+   * The evidence fact-extractor (guide Step 3). Vision-only like the judge:
+   * the API transport reads the uploaded bytes; cli/placeholder bind the
+   * null extractor and the stored extraction says the evidence was not
+   * machine-read.
+   */
+  readonly evidenceExtractor: EvidenceExtractor;
 }
 
 /**
@@ -127,6 +139,10 @@ export const getContainer = (): Container => {
     aiBackend,
     artifactJudge:
       aiBackend === "api" ? new ClaudeArtifactJudge() : new NullArtifactJudge(),
+    evidenceExtractor:
+      aiBackend === "api"
+        ? new ClaudeEvidenceExtractor()
+        : new NullEvidenceExtractor(),
   };
 
   return container;
